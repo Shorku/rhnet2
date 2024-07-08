@@ -1,0 +1,16 @@
+! RKS PBE def2-svp LargePrint nori noiter moread
+%moinp "{}.gbw"
+%output
+Print[P_Overlap] 1
+end
+%basis
+{}
+end
+%coords
+CTyp xyz
+Charge 0
+Mult 1
+coords
+{}
+end
+end

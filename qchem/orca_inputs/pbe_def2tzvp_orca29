@@ -1,0 +1,9 @@
+! RKS PBE def2-tzvp def2-tzvp/j
+%coords
+CTyp xyz
+Charge 0
+Mult 1
+coords
+{}
+end
+end
