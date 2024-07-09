@@ -7,13 +7,16 @@ from .custom_blocks import graph_block, dense_block
 
 def rhnet_v2(graph_spec,
              activation="elu",
-             l2=0,
              graph_depth=1,
              dense_depth=1,
+             head_dim=64,
+             head_depth=1,
              graph_pooling="concat",
              nodes_to_pool="atom",
-             head_dim=64,
-             head_depth=1):
+             head_l2=0,
+             head_dropout=0.5,
+             gnn_l2=0,
+             gnn_dropout=0.5):
     assert graph_pooling in ['mean',
                              'max',
                              'concat'], "Unrecognized graph pooling"
@@ -27,7 +30,8 @@ def rhnet_v2(graph_spec,
                             graph_depth=graph_depth,
                             dense_depth=dense_depth,
                             activation=activation,
-                            l2=l2)
+                            l2=gnn_l2,
+                            dropout=gnn_dropout)
     for layer in gnn_block:
         graph = layer(graph)
 
@@ -51,7 +55,8 @@ def rhnet_v2(graph_spec,
     output = dense_block(head_dim,
                          depth=head_depth,
                          activation=activation,
-                         l2=l2)(output)
+                         l2=head_l2,
+                         dropout=head_dropout)(output)
     output = tf.keras.layers.Dense(1, activation=None)(output)
 
     return tf.keras.Model(inputs=[input_graph], outputs=[output])

@@ -51,18 +51,22 @@ class ConvScaleByFeature(convolution_base.AnyToAnyConvolutionBase):
         return messages
 
 
-def dense_block(units, depth=1, activation='elu', l2=0):
-
-    return tf.keras.Sequential([tf.keras.layers.Dense(
-        units,
-        activation=activation,
-        kernel_regularizer=tf.keras.regularizers.l2(l2) if l2 else None,
-        bias_regularizer=tf.keras.regularizers.l2(l2) if l2 else None)
-        for i in range(depth)])
+def dense_block(units, depth=1, activation='elu', l2=0, dropout=0.0):
+    layers = []
+    for i in range(depth):
+        layers.append(tf.keras.layers.Dense(
+            units,
+            activation=activation,
+            kernel_regularizer=tf.keras.regularizers.l2(l2) if l2 else None,
+            bias_regularizer=tf.keras.regularizers.l2(l2) if l2 else None))
+        if dropout:
+            layers.append(tf.keras.layers.Dropout(rate=dropout))
+    return tf.keras.Sequential(layers)
 
 
 def graph_block(graph_spec,
-                graph_depth=1, dense_depth=1,  activation='elu', l2=0):
+                graph_depth=1, dense_depth=1,  activation='elu',
+                l2=0, dropout=0.5):
     atom_msg_dim = \
         graph_spec.node_sets_spec['atom'].features_spec['density'].shape[1]
     atom_nxt_dim = \
@@ -82,14 +86,16 @@ def graph_block(graph_spec,
                             message_fn=dense_block(atom_msg_dim,
                                                    depth=dense_depth,
                                                    activation=activation,
-                                                   l2=l2),
+                                                   l2=l2,
+                                                   dropout=dropout),
                             sender_edge_feature=tfgnn.HIDDEN_STATE,
                             receiver_tag=tfgnn.TARGET)},
                         tfgnn.keras.layers.NextStateFromConcat(
                             dense_block(link_nxt_dim,
                                         depth=dense_depth,
                                         activation=activation,
-                                        l2=l2)))}))
+                                        l2=l2,
+                                        dropout=dropout)))}))
         gnn.append(
             tfgnn.keras.layers.GraphUpdate(
                 node_sets={
@@ -98,12 +104,14 @@ def graph_block(graph_spec,
                             message_fn=dense_block(link_msg_dim,
                                                    depth=dense_depth,
                                                    activation=activation,
-                                                   l2=l2),
+                                                   l2=l2,
+                                                   dropout=dropout),
                             sender_edge_feature=tfgnn.HIDDEN_STATE,
                             receiver_tag=tfgnn.TARGET)},
                         tfgnn.keras.layers.NextStateFromConcat(
                             dense_block(atom_nxt_dim,
                                         depth=dense_depth,
                                         activation=activation,
-                                        l2=l2)))}))
+                                        l2=l2,
+                                        dropout=dropout)))}))
     return gnn
