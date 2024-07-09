@@ -127,30 +127,35 @@ def get_decode_fn(graph_spec, context_feature):
                              context_feature=context_feature)
 
 
-def balanced_dataset(graph_spec, data_path, shuffle_buffer=0, tfrecords=None):
+def balanced_dataset(graph_spec, data_path,
+                     shuffle_buffer=0,
+                     idc_list=None,
+                     compression_type=None):
     decode_fn = get_decode_fn(graph_spec, 'target')
     tfrecord_path = os.path.join(data_path, '{}')
-    if tfrecords:
-        tfrecords = [f'{tfrecord}.tfrecord' for tfrecord in tfrecords
-                     if f'{tfrecord}.tfrecord' in list(os.listdir(data_path))]
+    if idc_list:
+        idc_list = [f'{tfrecord}.tfrecord' for tfrecord in idc_list
+                    if f'{tfrecord}.tfrecord' in list(os.listdir(data_path))]
     else:
-        tfrecords = [fname for fname in os.listdir(data_path)
-                     if fname.endswith('.tfrecord')]
-    weights = [1 / len(tfrecords) for _ in tfrecords]
+        idc_list = [fname for fname in os.listdir(data_path)
+                    if fname.endswith('.tfrecord')]
+    weights = [1 / len(idc_list) for _ in idc_list]
 
     dataset = tf.data.Dataset.sample_from_datasets([
-        tf.data.TFRecordDataset([tfrecord_path.format(tfrecord)])
+        tf.data.TFRecordDataset([tfrecord_path.format(tfrecord)],
+                                compression_type=compression_type)
         .map(decode_fn)
         .cache()
         .shuffle(buffer_size=shuffle_buffer,
                  reshuffle_each_iteration=True)
         .repeat()
         if shuffle_buffer else
-        tf.data.TFRecordDataset([tfrecord_path.format(tfrecord)])
+        tf.data.TFRecordDataset([tfrecord_path.format(tfrecord)],
+                                compression_type=compression_type)
         .map(decode_fn)
         .cache()
         .repeat()
-        for tfrecord in tfrecords],
+        for tfrecord in idc_list],
         weights=weights,
         rerandomize_each_iteration=True if shuffle_buffer else False)
     return dataset
