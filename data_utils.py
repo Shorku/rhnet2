@@ -1,19 +1,27 @@
 import os
+import re
 import functools
 
 import pandas as pd
 import tensorflow as tf
 import tensorflow_gnn as tfgnn
 
-from .qchem import qchem_parsers
+from qchem_data_utils import blocks_from_orca
+from qchem_data_utils import dipole_from_orca_out
+from qchem_data_utils import surf_from_orca_out
+from qchem_data_utils import vol_from_orca_out
 
 
-def read_schema(schema_path):
+###############################################################################
+# TF-GNN data manipulation utilities
+###############################################################################
+def read_schema(schema_path: str):
     schema = tfgnn.read_schema(schema_path)
+
     return tfgnn.create_graph_spec_from_schema_pb(schema)
 
 
-def save_schema(nbas, schema_template_path, schema_save_path):
+def save_schema(nbas: int, schema_template_path: str, schema_save_path: str):
     with open(schema_template_path) as f:
         schema_template = f.read()
     with open(schema_save_path, 'w') as f:
@@ -21,110 +29,47 @@ def save_schema(nbas, schema_template_path, schema_save_path):
                                        noffdiag=nbas * nbas))
 
 
-def graph_from_orca(out_file, overlap_thresh, target, label):
-
-    diagonal_densities, off_diagonal_densities,  off_diagonal_overlaps, \
-        adjacency_atom2link_sources, adjacency_atom2link_targets, \
-        adjacency_link2atom_sources, adjacency_link2atom_targets, \
-        natoms, nlinks, nbas = \
-        qchem_parsers.blocks_from_orca(out_file, overlap_thresh)
-
-    graph = tfgnn.GraphTensor.from_pieces(context=tfgnn.Context.from_fields(
-            features={'target': tf.constant([target]),
-                      'id':  tf.constant([label])}),
-                                          node_sets={
-        "atom": tfgnn.NodeSet.from_fields(
-            sizes=tf.constant([natoms]),
-            features={"density": tf.constant(diagonal_densities)}),
-        "link": tfgnn.NodeSet.from_fields(
-            sizes=tf.constant([nlinks]),
-            features={"density": tf.constant(off_diagonal_densities)})},
-                                          edge_sets={
-        "atom2link": tfgnn.EdgeSet.from_fields(
-            sizes=tf.constant([nlinks]),
-            adjacency=tfgnn.Adjacency.from_indices(
-                source=("atom", tf.constant(adjacency_atom2link_sources)),
-                target=("link", tf.constant(adjacency_atom2link_targets))),
-            features={"overlap": tf.constant(off_diagonal_overlaps)}),
-        "link2atom": tfgnn.EdgeSet.from_fields(
-            sizes=tf.constant([nlinks]),
-            adjacency=tfgnn.Adjacency.from_indices(
-                source=("link", tf.constant(adjacency_link2atom_sources)),
-                target=("atom", tf.constant(adjacency_link2atom_targets))),
-            features={"overlap": tf.constant(off_diagonal_overlaps)})})
-    return graph, nbas
-
-
-def monolithic_record_from_orca(csv_path: str, orca_out_path: str,
-                                overlap_thresh: float, save_path: str,
-                                record_name: str, schema_template_path: str):
-    table = pd.read_csv(csv_path)
-    with tf.io.TFRecordWriter(
-            os.path.join(save_path, f'{record_name}.tfrecord')
-    ) as writer:
-        for idx, row in table.iterrows():
-            cas = row['cas']
-            target = row['target']
-            nconf = row['nconf']
-            for conf in range(nconf):
-                out_file = os.path.join(orca_out_path, f'{cas}_{conf}.zip')
-                print(out_file)
-                graph, nbas = \
-                    graph_from_orca(out_file, overlap_thresh, target, conf)
-                example = tfgnn.write_example(graph)
-                writer.write(example.SerializeToString())
-    save_schema(nbas, schema_template_path,
-                os.path.join(save_path, f'{record_name}.pbtxt'))
-
-
-def buckets_from_orca(csv_path: str, orca_out_path: str,
-                      overlap_thresh: float, save_path: str,
-                      record_name: str, schema_template_path: str):
-    table = pd.read_csv(csv_path)
-    tfrecord_save_path = os.path.join(save_path, record_name)
-    os.makedirs(tfrecord_save_path, exist_ok=True)
-    for idx, row in table.iterrows():
-        cas = row['cas']
-        target = row['target']
-        nconf = row['nconf']
-        with tf.io.TFRecordWriter(
-                os.path.join(tfrecord_save_path, f'{cas}.tfrecord')
-        ) as writer:
-            for conf in range(nconf):
-                out_file = os.path.join(orca_out_path, f'{cas}_{conf}.zip')
-                graph, nbas = \
-                    graph_from_orca(out_file, overlap_thresh, target, conf)
-                example = tfgnn.write_example(graph)
-                writer.write(example.SerializeToString())
-    save_schema(nbas, schema_template_path,
-                os.path.join(save_path, f'{record_name}.pbtxt'))
-
-
-def serialize_from_orca(csv_path: str, orca_out_path: str,
-                        overlap_thresh: float, save_path: str,
-                        record_name: str, schema_template_path: str,
-                        monolith: bool = True):
-    if monolith:
-        monolithic_record_from_orca(
-            csv_path, orca_out_path, overlap_thresh, save_path, record_name,
-            schema_template_path)
+def context_features(schema_template_path: str):
+    with open(schema_template_path) as f:
+        schema_template = f.read()
+    start = schema_template.find('context')
+    for i in range(start, len(schema_template)):
+        if schema_template[i] == '{':
+            opening = i
+            break
     else:
-        buckets_from_orca(
-            csv_path, orca_out_path, overlap_thresh, save_path, record_name,
-            schema_template_path)
+        raise Exception('Invalid schema')
+    counter = 0
+    for i in range(opening, len(schema_template)):
+        if schema_template[i] == '{':
+            counter += 1
+        if schema_template[i] == '}':
+            counter -= 1
+        if counter == 0:
+            ending = i
+            break
+    else:
+        raise Exception('Invalid schema')
+    matches = re.findall(r'features(.*?)key(.*?)[\',\"](.*?)[\',\"]',
+                         schema_template[opening:ending + 1],
+                         re.DOTALL)
+
+    return [match[-1] for match in matches]
 
 
-def decode_graph(record_bytes, graph_spec=None, context_feature=None):
+def decode_graph(record_bytes, graph_spec=None, targets=None):
     assert graph_spec is not None, "No graph specification provided"
-    assert context_feature is not None, "No context feature name provided"
+    assert targets is not None, "No targets provided"
     graph = tfgnn.parse_single_example(graph_spec, record_bytes, validate=True)
-    return graph, graph.context[context_feature]
+
+    return graph, {target: graph.context[target] for target in targets}
 
 
-def get_decode_fn(graph_spec, context_feature):
+def get_decode_fn(graph_spec, targets):
+
     return functools.partial(decode_graph,
                              graph_spec=graph_spec,
-                             context_feature=context_feature)
+                             targets=targets)
 
 
 def balanced_dataset(graph_spec, data_path,
@@ -162,7 +107,8 @@ def balanced_dataset(graph_spec, data_path,
 
 
 def init_node_state(node_set, *, node_set_name):
-    return node_set["density"]
+    return {"density":    node_set["density"],
+            "nuc_charge": node_set["nuc_charge"]}
 
 
 def init_edge_state(edge_set, *, edge_set_name):
@@ -171,3 +117,143 @@ def init_edge_state(edge_set, *, edge_set_name):
 
 def drop_features(graph_piece, **unused_kwargs):
     return {}
+
+
+###############################################################################
+# ORCA to TF-GNN data conversion utilities
+###############################################################################
+def graph_from_orca(out_file, overlap_thresh, target_features):
+
+    diagonal_densities,               \
+        off_diagonal_densities,       \
+        off_diagonal_overlaps,        \
+        adjacency_atom2link_sources,  \
+        adjacency_atom2link_targets,  \
+        adjacency_link2atom_sources,  \
+        adjacency_link2atom_targets,  \
+        atoms, natoms, nlinks, nbas = \
+        blocks_from_orca(out_file, overlap_thresh)
+
+    graph = tfgnn.GraphTensor.from_pieces(
+        context=tfgnn.Context.from_fields(
+            features={target_feature: tf.constant([target_value])
+                      for target_feature, target_value
+                      in target_features.items()}),
+        node_sets={
+            "atom": tfgnn.NodeSet.from_fields(
+                sizes=tf.constant([natoms]),
+                features={"density": tf.constant(diagonal_densities),
+                          "nuc_charge": tf.constant(atoms)}),
+            "link": tfgnn.NodeSet.from_fields(
+                sizes=tf.constant([nlinks]),
+                features={"density": tf.constant(off_diagonal_densities)})},
+        edge_sets={
+            "atom2link": tfgnn.EdgeSet.from_fields(
+                sizes=tf.constant([nlinks]),
+                adjacency=tfgnn.Adjacency.from_indices(
+                    source=("atom", tf.constant(adjacency_atom2link_sources)),
+                    target=("link", tf.constant(adjacency_atom2link_targets))),
+                features={"overlap": tf.constant(off_diagonal_overlaps)}),
+            "link2atom": tfgnn.EdgeSet.from_fields(
+                sizes=tf.constant([nlinks]),
+                adjacency=tfgnn.Adjacency.from_indices(
+                    source=("link", tf.constant(adjacency_link2atom_sources)),
+                    target=("atom", tf.constant(adjacency_link2atom_targets))),
+                features={"overlap": tf.constant(off_diagonal_overlaps)})})
+
+    return graph, nbas
+
+
+def tfrecord_from_orca(data_df: pd.DataFrame,
+                       orca_out_path: str,
+                       overlap_thresh: float,
+                       save_path: str,
+                       record_name: str,
+                       targets: list,
+                       scalings: dict,
+                       rot_aug: int = 1,
+                       gepol_path: str = ''):
+    record_path = os.path.join(save_path, f'{record_name}.tfrecord')
+    record_options = tf.io.TFRecordOptions(compression_type='GZIP')
+
+    target_functions_dict = {'dipole': dipole_from_orca_out,
+                             'vol': functools.partial(vol_from_orca_out,
+                                                      gepol_path=gepol_path),
+                             'surf': functools.partial(surf_from_orca_out,
+                                                       gepol_path=gepol_path)}
+
+    def context_features_values(row, out_file, targets, scalings):
+        target_values = {target: row[target] / scalings.get(target, 1.0)
+                         if target in row
+                         else (target_functions_dict[target](out_file)
+                               / scalings.get(target, 1.0))
+                         for target in targets}
+        return target_values
+
+    with tf.io.TFRecordWriter(record_path, options=record_options) as writer:
+        for idx, row in data_df.iterrows():
+            isomer = row['isomer_id']
+            nconf = row['nconf']
+            for conf in range(1, nconf + 1):
+                prop_out_file = os.path.join(orca_out_path,
+                                             f'{isomer}_{conf}_1.zip')
+                target_features = context_features_values(row,
+                                                          prop_out_file,
+                                                          targets,
+                                                          scalings)
+                for aug in range(1 + rot_aug + 1):
+                    out_file = os.path.join(orca_out_path,
+                                            f'{isomer}_{conf}_{aug}.zip')
+                    graph, nbas = graph_from_orca(out_file,
+                                                  overlap_thresh,
+                                                  target_features)
+                    example = tfgnn.write_example(graph)
+                    writer.write(example.SerializeToString())
+
+    return nbas
+
+
+def serialize_from_orca(csv_path: str,
+                        orca_out_path: str,
+                        overlap_thresh: float,
+                        save_path: str,
+                        record_name: str,
+                        schema_template_path: str,
+                        scalings_csv_path: str = '',
+                        monolith: bool = True,
+                        multi_target: bool = False,
+                        rot_aug: int = 1):
+    data_df = pd.read_csv(csv_path)
+    os.makedirs(os.path.join(save_path, record_name), exist_ok=True)
+    targets = \
+        context_features(schema_template_path) if multi_target else ['target']
+    if scalings_csv_path:
+        scalings_df = pd.read_csv(scalings_csv_path)
+        scalings = {target: divisor for target, divisor
+                    in zip(scalings_df['target'].to_list,
+                           scalings_df['divisor'].to_list)}
+    else:
+        scalings = {}
+    if monolith:
+        nbas = tfrecord_from_orca(data_df=data_df,
+                                  orca_out_path=orca_out_path,
+                                  overlap_thresh=overlap_thresh,
+                                  save_path=os.path.join(save_path,
+                                                         record_name),
+                                  record_name=record_name,
+                                  targets=targets,
+                                  scalings=scalings,
+                                  rot_aug=rot_aug)
+    else:
+        for cas in data_df['cas'].unique():
+            nbas = tfrecord_from_orca(data_df=data_df[data_df['cas'] == cas],
+                                      orca_out_path=orca_out_path,
+                                      overlap_thresh=overlap_thresh,
+                                      save_path=os.path.join(save_path,
+                                                             record_name),
+                                      record_name=cas,
+                                      targets=targets,
+                                      scalings=scalings,
+                                      rot_aug=rot_aug)
+    save_schema(nbas, schema_template_path,
+                os.path.join(save_path, f'{record_name}.pbtxt'))
