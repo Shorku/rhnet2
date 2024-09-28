@@ -66,7 +66,6 @@ def decode_graph(record_bytes, graph_spec=None, targets=None):
 
 
 def get_decode_fn(graph_spec, targets):
-
     return functools.partial(decode_graph,
                              graph_spec=graph_spec,
                              targets=targets)
@@ -103,6 +102,7 @@ def balanced_dataset(graph_spec, data_path,
         for tfrecord in idc_list],
         weights=weights,
         rerandomize_each_iteration=True if shuffle_buffer else False)
+
     return dataset
 
 
