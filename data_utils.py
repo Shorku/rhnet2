@@ -196,12 +196,12 @@ def tfrecord_from_orca(data_df: pd.DataFrame,
             nconf = row['nconf']
             for conf in range(1, nconf + 1):
                 prop_out_file = os.path.join(orca_out_path,
-                                             f'{isomer}_{conf}_1.zip')
+                                             f'{isomer}_{conf}_1_dft.zip')
                 target_features = context_features_values(row,
                                                           prop_out_file,
                                                           targets,
                                                           scalings)
-                for aug in range(1 + rot_aug + 1):
+                for aug in range(1, rot_aug + 1):
                     out_file = os.path.join(orca_out_path,
                                             f'{isomer}_{conf}_{aug}.zip')
                     graph, nbas = graph_from_orca(out_file,
@@ -222,7 +222,8 @@ def serialize_from_orca(csv_path: str,
                         scalings_csv_path: str = '',
                         monolith: bool = True,
                         multi_target: bool = False,
-                        rot_aug: int = 1):
+                        rot_aug: int = 1,
+                        gepol_path: str = ''):
     data_df = pd.read_csv(csv_path)
     os.makedirs(os.path.join(save_path, record_name), exist_ok=True)
     targets = \
@@ -230,8 +231,8 @@ def serialize_from_orca(csv_path: str,
     if scalings_csv_path:
         scalings_df = pd.read_csv(scalings_csv_path)
         scalings = {target: divisor for target, divisor
-                    in zip(scalings_df['target'].to_list,
-                           scalings_df['divisor'].to_list)}
+                    in zip(scalings_df['target'].to_list(),
+                           scalings_df['divisor'].to_list())}
     else:
         scalings = {}
     if monolith:
@@ -243,7 +244,8 @@ def serialize_from_orca(csv_path: str,
                                   record_name=record_name,
                                   targets=targets,
                                   scalings=scalings,
-                                  rot_aug=rot_aug)
+                                  rot_aug=rot_aug,
+                                  gepol_path=gepol_path)
     else:
         for cas in data_df['cas'].unique():
             nbas = tfrecord_from_orca(data_df=data_df[data_df['cas'] == cas],
@@ -254,6 +256,7 @@ def serialize_from_orca(csv_path: str,
                                       record_name=cas,
                                       targets=targets,
                                       scalings=scalings,
-                                      rot_aug=rot_aug)
+                                      rot_aug=rot_aug,
+                                      gepol_path=gepol_path)
     save_schema(nbas, schema_template_path,
                 os.path.join(save_path, f'{record_name}.pbtxt'))

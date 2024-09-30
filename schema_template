@@ -54,7 +54,6 @@ node_sets {{
     description: "Atoms in molecule"
     features {{
       key: "density"
-      description: "density matrix"
       value: {{
         dtype: DT_FLOAT
         shape: {{ dim: {{ size: {ndiag} }} }}
@@ -62,7 +61,6 @@ node_sets {{
     }}
     features {{
       key: "nuc_charge"
-      description: "atom nuclear charge"
       value: {{
         dtype: DT_FLOAT
         shape: {{ dim: {{ size: 1 }} }}
