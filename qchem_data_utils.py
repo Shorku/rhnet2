@@ -126,21 +126,42 @@ def vol_surf_from_geom(geom: str, gepol_path: str):
     return vol, surf
 
 
-def vol_from_orca_out(out_file: str, gepol_path: str = ''):
+def vol_from_orca_out(out_file: str, gepol_path: str = '',
+                      dummy: bool = False):
+    if dummy:
+        return 1.0
     geom = read_geom_from_out(out_file)
     vol = vol_surf_from_geom(geom, gepol_path)[0]
 
     return vol
 
 
-def surf_from_orca_out(out_file: str, gepol_path: str = ''):
+def surf_from_orca_out(out_file: str, gepol_path: str = '',
+                       dummy: bool = False):
+    if dummy:
+        return 1.0
     geom = read_geom_from_out(out_file)
     surf = vol_surf_from_geom(geom, gepol_path)[1]
 
     return surf
 
 
-def matrices_from_orca(out_file: str):
+def matrices_from_orca(out_file: str, dummy: bool = False):
+    if dummy:
+        dm = np.array([[1., 1., 1., 1.],
+                       [1., 1., 1., 1.],
+                       [1., 1., 1., 1.],
+                       [1., 1., 1., 1.]])
+        ovrlp = np.array([[0.1, 0.1, 0.1, 0.1],
+                          [0.1, 0.1, 0.1, 0.1],
+                          [0.1, 0.1, 0.1, 0.1],
+                          [0.1, 0.1, 0.1, 0.1]])
+        atoms = [[0.09], [0.09]]
+        coords = [[0., 0., 0.], [0., 0., 1.]]
+        nbas_tot = 4
+        natoms = 2
+        return dm, ovrlp, atoms, coords, nbas_tot, natoms
+
     supported_orca_versions = \
         ['2.9.1', '5.0.0', '5.0.1', '5.0.2', '5.0.3', '5.0.4']
     charg = {'H':   1.0,
@@ -221,8 +242,10 @@ def matrices_from_orca(out_file: str):
     return dm, ovrlp, atoms, coords, nbas_tot, natoms
 
 
-def blocks_from_orca(out_file: str, overlap_thresh: float):
-    dm, ovrlp, atoms, coords, nbas_tot, natoms = matrices_from_orca(out_file)
+def blocks_from_orca(out_file: str, overlap_thresh: float,
+                     dummy: bool = False):
+    dm, ovrlp, atoms, coords, nbas_tot, natoms = \
+        matrices_from_orca(out_file, dummy=dummy)
     nbas = nbas_tot // natoms
     diagonal_densities = []
     off_diagonal_densities = []

@@ -59,13 +59,14 @@ def context_features(schema_template_path: str):
 
 def decode_graph(record_bytes, graph_spec=None, targets=None):
     assert graph_spec is not None, "No graph specification provided"
-    assert targets is not None, "No targets provided"
     graph = tfgnn.parse_single_example(graph_spec, record_bytes, validate=True)
+    if targets:
+        return graph, {target: graph.context[target] for target in targets}
+    else:
+        return graph
 
-    return graph, {target: graph.context[target] for target in targets}
 
-
-def get_decode_fn(graph_spec, targets):
+def get_decode_fn(graph_spec, targets=None):
     return functools.partial(decode_graph,
                              graph_spec=graph_spec,
                              targets=targets)
@@ -107,8 +108,11 @@ def balanced_dataset(graph_spec, data_path,
 
 
 def init_node_state(node_set, *, node_set_name):
-    return {"density":    node_set["density"],
-            "nuc_charge": node_set["nuc_charge"]}
+    if node_set_name == 'atom':
+        return tf.concat([node_set["density"], node_set["nuc_charge"]],
+                         axis=-1)
+    else:
+        return node_set["density"]
 
 
 def init_edge_state(edge_set, *, edge_set_name):
@@ -122,7 +126,10 @@ def drop_features(graph_piece, **unused_kwargs):
 ###############################################################################
 # ORCA to TF-GNN data conversion utilities
 ###############################################################################
-def graph_from_orca(out_file, overlap_thresh, target_features):
+def graph_from_orca(out_file: str,
+                    overlap_thresh: float,
+                    target_features: dict,
+                    dummy: bool = False):
 
     diagonal_densities,               \
         off_diagonal_densities,       \
@@ -132,7 +139,7 @@ def graph_from_orca(out_file, overlap_thresh, target_features):
         adjacency_link2atom_sources,  \
         adjacency_link2atom_targets,  \
         atoms, natoms, nlinks, nbas = \
-        blocks_from_orca(out_file, overlap_thresh)
+        blocks_from_orca(out_file, overlap_thresh, dummy=dummy)
 
     graph = tfgnn.GraphTensor.from_pieces(
         context=tfgnn.Context.from_fields(
@@ -172,15 +179,18 @@ def tfrecord_from_orca(data_df: pd.DataFrame,
                        targets: list,
                        scalings: dict,
                        rot_aug: int = 1,
-                       gepol_path: str = ''):
+                       gepol_path: str = '',
+                       dummy: bool = False):
     record_path = os.path.join(save_path, f'{record_name}.tfrecord')
     record_options = tf.io.TFRecordOptions(compression_type='GZIP')
 
     target_functions_dict = {'dipole': dipole_from_orca_out,
                              'vol': functools.partial(vol_from_orca_out,
-                                                      gepol_path=gepol_path),
+                                                      gepol_path=gepol_path,
+                                                      dummy=dummy),
                              'surf': functools.partial(surf_from_orca_out,
-                                                       gepol_path=gepol_path)}
+                                                       gepol_path=gepol_path,
+                                                       dummy=dummy)}
 
     def context_features_values(row, out_file, targets, scalings):
         target_values = {target: row[target] / scalings.get(target, 1.0)
@@ -206,7 +216,8 @@ def tfrecord_from_orca(data_df: pd.DataFrame,
                                             f'{isomer}_{conf}_{aug}.zip')
                     graph, nbas = graph_from_orca(out_file,
                                                   overlap_thresh,
-                                                  target_features)
+                                                  target_features,
+                                                  dummy=dummy)
                     example = tfgnn.write_example(graph)
                     writer.write(example.SerializeToString())
 
@@ -223,7 +234,8 @@ def serialize_from_orca(csv_path: str,
                         monolith: bool = True,
                         multi_target: bool = False,
                         rot_aug: int = 1,
-                        gepol_path: str = ''):
+                        gepol_path: str = '',
+                        dummy: bool = False):
     data_df = pd.read_csv(csv_path)
     os.makedirs(os.path.join(save_path, record_name), exist_ok=True)
     targets = \
@@ -245,7 +257,8 @@ def serialize_from_orca(csv_path: str,
                                   targets=targets,
                                   scalings=scalings,
                                   rot_aug=rot_aug,
-                                  gepol_path=gepol_path)
+                                  gepol_path=gepol_path,
+                                  dummy=dummy)
     else:
         for cas in data_df['cas'].unique():
             nbas = tfrecord_from_orca(data_df=data_df[data_df['cas'] == cas],
@@ -257,6 +270,7 @@ def serialize_from_orca(csv_path: str,
                                       targets=targets,
                                       scalings=scalings,
                                       rot_aug=rot_aug,
-                                      gepol_path=gepol_path)
+                                      gepol_path=gepol_path,
+                                      dummy=dummy)
     save_schema(nbas, schema_template_path,
                 os.path.join(save_path, f'{record_name}.pbtxt'))
