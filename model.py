@@ -6,22 +6,22 @@ from data_utils import init_node_state, init_edge_state, drop_features
 from custom_blocks import dense_block, ConvScaleByFeature
 
 
-def rhnet_v2(schema_path: str,
-             activation: str = "elu",
-             head_kernel_l2: float = 0.0,
-             head_bias_l2: float = 0.0,
-             head_dropout: float = 0.25,
-             gnn_dropout: float = 0.0,
-             gnn_kernel_l2: float = 0.0,
-             gnn_bias_l2: float = 0.0,
-             graph_depth: int = 1,
-             gnn_dense_depth: int = 1,
-             graph_pooling: str = "concat",
-             nodes_to_pool: str = "atom",
-             head_width: int = 64,
-             head_depth: int = 1,
-             multi_target: bool = False,
-             single_head_dense: bool = True):
+def neuro_mulliken(schema_path: str,
+                   activation: str = "elu",
+                   head_kernel_l2: float = 0.0,
+                   head_bias_l2: float = 0.0,
+                   head_dropout: float = 0.25,
+                   gnn_kernel_l2: float = 0.0,
+                   gnn_bias_l2: float = 0.0,
+                   gnn_dropout: float = 0.0,
+                   graph_depth: int = 1,
+                   gnn_dense_depth: int = 1,
+                   graph_pooling: str = "concat",
+                   nodes_to_pool: str = "atom",
+                   head_width: int = 64,
+                   head_depth: int = 1,
+                   multi_target: bool = False,
+                   single_head_dense: bool = True):
 
     assert graph_pooling in ['mean',
                              'max',
