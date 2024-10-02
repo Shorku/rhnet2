@@ -27,8 +27,7 @@ def rhnet_v2(schema_path: str,
                              'max',
                              'concat'], "Unrecognized graph pooling"
     graph_spec = read_schema(schema_path)
-    targets = \
-        context_features(schema_path) if multi_target else ['target']
+    targets = context_features(schema_path, multi_target=multi_target)
     input_graph = tf.keras.layers.Input(type_spec=graph_spec)
     graph = input_graph.merge_batch_to_components()
     graph = tfgnn.keras.layers.MapFeatures(node_sets_fn=init_node_state,

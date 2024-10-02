@@ -29,7 +29,7 @@ def save_schema(nbas: int, schema_template_path: str, schema_save_path: str):
                                        noffdiag=nbas * nbas))
 
 
-def context_features(schema_template_path: str):
+def context_features(schema_template_path: str, multi_target: bool = True):
     with open(schema_template_path) as f:
         schema_template = f.read()
     start = schema_template.find('context')
@@ -53,8 +53,14 @@ def context_features(schema_template_path: str):
     matches = re.findall(r'features(.*?)key(.*?)[\',\"](.*?)[\',\"]',
                          schema_template[opening:ending + 1],
                          re.DOTALL)
-
-    return [match[-1] for match in matches]
+    targets = [match[-1] for match in matches]
+    if multi_target:
+        return targets
+    else:
+        if 'target' not in targets:
+            raise KeyError('Schema context should include target feature')
+        else:
+            return ['target']
 
 
 def decode_graph(record_bytes, graph_spec=None, targets=None):
@@ -72,37 +78,45 @@ def get_decode_fn(graph_spec, targets=None):
                              targets=targets)
 
 
-def balanced_dataset(graph_spec, data_path,
-                     shuffle_buffer=0,
-                     idc_list=None,
-                     compression_type=None):
-    decode_fn = get_decode_fn(graph_spec, 'target')
-    tfrecord_path = os.path.join(data_path, '{}')
-    if idc_list:
-        idc_list = [f'{tfrecord}.tfrecord' for tfrecord in idc_list
-                    if f'{tfrecord}.tfrecord' in list(os.listdir(data_path))]
+def balanced_dataset(schema_path: str,
+                     data_path: str,
+                     records_list: list = None,
+                     noise_stddev: dict = None,
+                     multi_target: bool = False,
+                     shuffle_buffer: dict = None,
+                     compression_type: str = None):
+    graph_spec = read_schema(schema_path)
+    targets = context_features(schema_path, multi_target=multi_target)
+    decode_fn = get_decode_fn(graph_spec, targets)
+    tfrecord_path_template = os.path.join(data_path, '{}')
+    if records_list:
+        records_list = [f'{record}.tfrecord' for record in records_list
+                        if f'{record}.tfrecord' in list(os.listdir(data_path))]
     else:
-        idc_list = [fname for fname in os.listdir(data_path)
-                    if fname.endswith('.tfrecord')]
-    weights = [1 / len(idc_list) for _ in idc_list]
+        records_list = [fname for fname in os.listdir(data_path)
+                        if fname.endswith('.tfrecord')]
+    weights = [1 / len(records_list) for _ in records_list]
 
-    dataset = tf.data.Dataset.sample_from_datasets([
-        tf.data.TFRecordDataset([tfrecord_path.format(tfrecord)],
-                                compression_type=compression_type)
-        .map(decode_fn)
-        .cache()
-        .shuffle(buffer_size=shuffle_buffer,
-                 reshuffle_each_iteration=True)
-        .repeat()
-        if shuffle_buffer else
-        tf.data.TFRecordDataset([tfrecord_path.format(tfrecord)],
-                                compression_type=compression_type)
-        .map(decode_fn)
-        .cache()
-        .repeat()
-        for tfrecord in idc_list],
+    def target_noise(x, y):
+        for target, stddev in noise_stddev.items():
+            y[target] = y[target] + tf.random.normal(shape=tf.shape(y[target]),
+                                                     mean=0.0, stddev=stddev)
+        return x, y
+
+    bucket = [tf.data.TFRecordDataset(
+                [tfrecord_path_template.format(record)],
+                compression_type=compression_type
+        ).map(decode_fn).cache().repeat() for record in records_list]
+    if shuffle_buffer is not None:
+        bucket = [data.shuffle(buffer_size=shuffle_buffer[record],
+                               reshuffle_each_iteration=True)
+                  for data, record in zip(bucket, records_list)]
+    if noise_stddev is not None:
+        bucket = [data.map(lambda x, y: target_noise(x, y)) for data in bucket]
+    dataset = tf.data.Dataset.sample_from_datasets(
+        bucket,
         weights=weights,
-        rerandomize_each_iteration=True if shuffle_buffer else False)
+        rerandomize_each_iteration=True)
 
     return dataset
 
