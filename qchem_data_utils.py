@@ -37,6 +37,26 @@ def rotate_geom(atoms: list, coords: list):
 ###############################################################################
 # ORCA outputs parsing utilities
 ###############################################################################
+def check_out_termination_failure(out_file: str):
+    if out_file.endswith('.zip'):
+        z = zipfile.ZipFile(out_file)
+        fname = f'{pathlib.Path(out_file).stem}.out'
+        if fname not in z.namelist():
+            z.close()
+            return True
+        f = io.TextIOWrapper(z.open(fname), encoding='utf-8')
+    else:
+        f = open(out_file)
+    contents = f.readlines()
+    f.close()
+    if out_file.endswith('.zip'):
+        z.close()
+    if '****ORCA TERMINATED NORMALLY****' in contents[-2]:
+        return False
+    else:
+        return True
+
+
 def read_geom_from_out(out_file: str):
     geom = ''
     if out_file.endswith('.zip'):
