@@ -98,7 +98,8 @@ def main():
                         scalings_csv_path=params.scalings_csv,
                         monolith=params.monolith,
                         multi_target=params.multi_target,
-                        rot_aug=params.rot_aug)
+                        rot_aug=params.rot_aug,
+                        gepol_path=params.gepol_path)
 
 
 if __name__ == '__main__':
