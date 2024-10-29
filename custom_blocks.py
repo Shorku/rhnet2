@@ -57,6 +57,8 @@ def dense_block(units: int,
                 kernel_l2: float = 0.0,
                 bias_l2: float = 0.0,
                 dropout: float = 0.0):
+    if depth == 0:
+        return tf.keras.Sequential([])
     layers = []
     for i in range(depth - 1):
         layers.append(tf.keras.layers.Dense(

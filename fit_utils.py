@@ -331,3 +331,4 @@ def ensemble_fit(schema_path: str,
                               base_name=f'{base_name}_model{n}',
                               multi_target=multi_target)
         tf.keras.backend.clear_session()
+    return base_name
