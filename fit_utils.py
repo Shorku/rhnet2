@@ -199,6 +199,7 @@ def loo_val(schema_path: str,
             if model_save_path else None)[0].history
         for key, value in history.items():
             loo_history[f'{record}.{key}'] = value
+        tf.keras.backend.clear_session()
     return loo_history
 
 
