@@ -30,6 +30,7 @@ def model_fit(schema_path: str,
               head_width: int = 64,
               head_depth: int = 0,
               multi_target: bool = True,
+              targets: list = None,
               single_head_dense: bool = True,
               noise_stddev: dict = None,
               shuffle_buffer: dict = None,
@@ -44,12 +45,15 @@ def model_fit(schema_path: str,
               loss_weights: dict = None,
               verbose: str = "auto",
               model_save_path: str = None):
-    targets = context_features(schema_path, multi_target=multi_target)
+    targets = context_features(schema_path,
+                               multi_target=multi_target,
+                               requested_targets=targets)
     train_data = balanced_dataset(schema_path,
                                   train_data_path,
                                   records_list=train_records_list,
                                   noise_stddev=noise_stddev,
                                   multi_target=multi_target,
+                                  targets=targets,
                                   shuffle_buffer=shuffle_buffer,
                                   compression_type=compression_type) \
         .batch(batch_size=batch_size).prefetch(1)
@@ -59,6 +63,7 @@ def model_fit(schema_path: str,
                                     records_list=val_records_list,
                                     noise_stddev=None,
                                     multi_target=multi_target,
+                                    targets=targets,
                                     shuffle_buffer=None,
                                     compression_type=compression_type) \
             .batch(batch_size=batch_size).prefetch(1)
@@ -79,6 +84,7 @@ def model_fit(schema_path: str,
                    head_width=head_width,
                    head_depth=head_depth,
                    multi_target=multi_target,
+                   targets=targets,
                    single_head_dense=single_head_dense)
     if learning_decay_rate:
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
@@ -93,6 +99,10 @@ def model_fit(schema_path: str,
             for target in targets}
     if loss_weights is None:
         loss_weights = {target: 1.0 for target in targets}
+    else:
+        loss_weights = {loss: weight
+                        for loss, weight in loss_weights.items()
+                        if loss in targets}
 
     model.compile(optimizer=optimizer,
                   loss=loss,
@@ -136,6 +146,7 @@ def loo_val(schema_path: str,
             head_width: int = 64,
             head_depth: int = 1,
             multi_target: bool = False,
+            targets: list = None,
             single_head_dense: bool = True,
             noise_stddev: dict = None,
             shuffle_buffer: dict = None,
@@ -182,6 +193,7 @@ def loo_val(schema_path: str,
             head_width=head_width,
             head_depth=head_depth,
             multi_target=multi_target,
+            targets=targets,
             single_head_dense=single_head_dense,
             noise_stddev=noise_stddev,
             shuffle_buffer=shuffle_buffer,
@@ -208,9 +220,12 @@ def predict_on_record(model: tf.keras.Model,
                       data_path: str,
                       log_path: str,
                       base_name: str,
-                      multi_target: bool = False):
+                      multi_target: bool = False,
+                      targets: list = None):
     decode_fn = get_decode_fn(read_schema(schema_path))
-    targets = context_features(schema_path, multi_target=multi_target)
+    targets = context_features(schema_path,
+                               multi_target=multi_target,
+                               requested_targets=targets)
     os.makedirs(os.path.join(log_path,
                              f'Predictions_{base_name}'), exist_ok=True)
     for record in os.listdir(data_path):
@@ -252,6 +267,7 @@ def ensemble_fit(schema_path: str,
                  head_width: int = 64,
                  head_depth: int = 1,
                  multi_target: bool = True,
+                 targets: list = None,
                  single_head_dense: bool = True,
                  noise_stddev: dict = None,
                  shuffle_buffer: dict = None,
@@ -296,6 +312,7 @@ def ensemble_fit(schema_path: str,
             head_width=head_width,
             head_depth=head_depth,
             multi_target=multi_target,
+            targets=targets,
             single_head_dense=single_head_dense,
             noise_stddev=noise_stddev,
             shuffle_buffer=shuffle_buffer,
@@ -323,13 +340,15 @@ def ensemble_fit(schema_path: str,
                               data_path=train_data_path,
                               log_path=log_path,
                               base_name=f'{base_name}_model{n}',
-                              multi_target=multi_target)
+                              multi_target=multi_target,
+                              targets=targets)
         if predict_on_val:
             predict_on_record(model=model,
                               schema_path=schema_path,
                               data_path=val_data_path,
                               log_path=log_path,
                               base_name=f'{base_name}_model{n}',
-                              multi_target=multi_target)
+                              multi_target=multi_target,
+                              targets=targets)
         tf.keras.backend.clear_session()
     return base_name

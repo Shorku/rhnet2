@@ -29,7 +29,9 @@ def save_schema(nbas: int, schema_template_path: str, schema_save_path: str):
                                        noffdiag=nbas * nbas))
 
 
-def context_features(schema_template_path: str, multi_target: bool = True):
+def context_features(schema_template_path: str,
+                     multi_target: bool = True,
+                     requested_targets: list = None):
     with open(schema_template_path) as f:
         schema_template = f.read()
     start = schema_template.find('context')
@@ -55,6 +57,11 @@ def context_features(schema_template_path: str, multi_target: bool = True):
                          re.DOTALL)
     targets = [match[-1] for match in matches]
     if multi_target:
+        if requested_targets is not None:
+            targets = \
+                [target for target in targets if target in requested_targets]
+        if len(targets) == 0:
+            raise KeyError('No targets found in schema context')
         return targets
     else:
         if 'target' not in targets:
@@ -83,10 +90,13 @@ def balanced_dataset(schema_path: str,
                      records_list: list = None,
                      noise_stddev: dict = None,
                      multi_target: bool = False,
+                     targets: list = None,
                      shuffle_buffer: dict = None,
                      compression_type: str = None):
     graph_spec = read_schema(schema_path)
-    targets = context_features(schema_path, multi_target=multi_target)
+    targets = context_features(schema_path,
+                               multi_target=multi_target,
+                               requested_targets=targets)
     decode_fn = get_decode_fn(graph_spec, targets)
     tfrecord_path_template = os.path.join(data_path, '{}')
     if records_list:
@@ -99,8 +109,11 @@ def balanced_dataset(schema_path: str,
 
     def target_noise(x, y):
         for target, stddev in noise_stddev.items():
-            y[target] = y[target] + tf.random.normal(shape=tf.shape(y[target]),
-                                                     mean=0.0, stddev=stddev)
+            if target in targets:
+                y[target] = y[target] + tf.random.normal(
+                    shape=tf.shape(y[target]),
+                    mean=0.0,
+                    stddev=stddev)
         return x, y
 
     bucket = [tf.data.TFRecordDataset(

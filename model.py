@@ -21,13 +21,16 @@ def neurom(schema_path: str,
            head_width: int = 64,
            head_depth: int = 1,
            multi_target: bool = False,
+           targets: list = None,
            single_head_dense: bool = True):
 
     assert graph_pooling in ['mean',
                              'max',
                              'concat'], "Unrecognized graph pooling"
     graph_spec = read_schema(schema_path)
-    targets = context_features(schema_path, multi_target=multi_target)
+    targets = context_features(schema_path,
+                               multi_target=multi_target,
+                               requested_targets=targets)
     input_graph = tf.keras.layers.Input(type_spec=graph_spec)
     graph = input_graph.merge_batch_to_components()
     graph = tfgnn.keras.layers.MapFeatures(node_sets_fn=init_node_state,
