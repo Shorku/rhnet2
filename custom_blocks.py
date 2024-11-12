@@ -1,6 +1,8 @@
 import tensorflow as tf
 
+from tfkan.layers import DenseKAN
 from typing import Any, Callable, Optional
+from tensorflow_gnn.graph import graph_tensor as gt
 from tensorflow_gnn.keras.layers import convolution_base
 from tensorflow_gnn.graph import graph_constants as const
 
@@ -51,17 +53,46 @@ class ConvScaleByFeature(convolution_base.AnyToAnyConvolutionBase):
         return messages
 
 
+@tf.keras.utils.register_keras_serializable()
+class NodeSetScaler(tf.keras.layers.Layer):
+    def __init__(self,
+                 weighting_fn: tf.keras.layers.Layer,
+                 node_input_feature:
+                 const.FieldNameOrNames = const.HIDDEN_STATE,
+                 **kwargs):
+        super().__init__(**kwargs)
+        self._weighting_fn = weighting_fn
+        self._node_input_feature = node_input_feature
+
+    def get_config(self):
+        return dict(
+            node_input_feature=self._node_input_feature,
+            **super().get_config())
+
+    def call(self, graph: gt.GraphTensor,
+             node_set_name: const.NodeSetName) -> gt.GraphTensor:
+        inputs = \
+            graph.node_sets[node_set_name][self._node_input_feature]
+        weights = self._weighting_fn(inputs)
+        inputs = tf.math.multiply(inputs, weights)
+
+        return inputs
+
+
 def dense_block(units: int,
                 depth: int = 1,
+                use_kan: bool = False,
                 activation: str = 'elu',
                 kernel_l2: float = 0.0,
                 bias_l2: float = 0.0,
-                dropout: float = 0.0):
+                dropout: float = 0.0,
+                single_digit_output: bool = False):
     if depth == 0:
         return tf.keras.Sequential([])
     layers = []
     for i in range(depth - 1):
-        layers.append(tf.keras.layers.Dense(
+        layers.append(DenseKAN(units) if use_kan else
+                      tf.keras.layers.Dense(
             units,
             activation=activation,
             kernel_regularizer=tf.keras.regularizers.l2(
@@ -69,17 +100,19 @@ def dense_block(units: int,
             bias_regularizer=tf.keras.regularizers.l2(
                 bias_l2) if bias_l2 else None,
             kernel_initializer=tf.keras.initializers.LecunNormal(),
-            bias_initializer='zeros'))
-        if dropout:
+            bias_initializer='zeros')
+        )
+        if dropout and not use_kan:
             layers.append(tf.keras.layers.Dropout(rate=dropout))
-    layers.append(tf.keras.layers.Dense(
-        units,
-        activation=activation,
-        kernel_regularizer=tf.keras.regularizers.l2(
-            kernel_l2) if kernel_l2 else None,
-        bias_regularizer=tf.keras.regularizers.l2(
-            bias_l2) if bias_l2 else None,
-        kernel_initializer=tf.keras.initializers.LecunNormal(),
-        bias_initializer='zeros'))
+    layers.append(DenseKAN(units) if use_kan
+                  else tf.keras.layers.Dense(
+            1 if single_digit_output else units,
+            activation=None if single_digit_output else activation,
+            kernel_regularizer=tf.keras.regularizers.l2(
+                kernel_l2) if kernel_l2 else None,
+            bias_regularizer=tf.keras.regularizers.l2(
+                bias_l2) if bias_l2 else None,
+            kernel_initializer=tf.keras.initializers.LecunNormal(),
+            bias_initializer='zeros'))
 
     return tf.keras.Sequential(layers)
