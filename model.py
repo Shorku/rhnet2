@@ -85,23 +85,7 @@ def neurom(schema_path: str,
                                     bias_l2=gnn_bias_l2,
                                     dropout=gnn_dropout)))})(graph)
 
-    if graph_pooling == 'mean':
-        output = tfgnn.keras.layers.Pool(tfgnn.CONTEXT,
-                                         'mean',
-                                         node_set_name=nodes_to_pool)(graph)
-    elif graph_pooling == 'max':
-        output = tfgnn.keras.layers.Pool(tfgnn.CONTEXT,
-                                         'max_no_inf',
-                                         node_set_name=nodes_to_pool)(graph)
-    elif graph_pooling == 'concat':
-        output1 = tfgnn.keras.layers.Pool(tfgnn.CONTEXT,
-                                          'mean',
-                                          node_set_name=nodes_to_pool)(graph)
-        output2 = tfgnn.keras.layers.Pool(tfgnn.CONTEXT,
-                                          'max_no_inf',
-                                          node_set_name=nodes_to_pool)(graph)
-        output = tf.keras.layers.Concatenate(axis=-1)([output1, output2])
-    elif graph_pooling == 'weighted':
+    if graph_pooling == 'weighted':
         graph = tfgnn.keras.layers.GraphUpdate(
             node_sets={
                 "atom": NodeSetScaler(
@@ -114,13 +98,13 @@ def neurom(schema_path: str,
                                 single_digit_output=True),
                     node_input_feature=tfgnn.HIDDEN_STATE
                 )})(graph)
-        output1 = tfgnn.keras.layers.Pool(tfgnn.CONTEXT,
-                                          'mean',
-                                          node_set_name=nodes_to_pool)(graph)
-        output2 = tfgnn.keras.layers.Pool(tfgnn.CONTEXT,
-                                          'max_no_inf',
-                                          node_set_name=nodes_to_pool)(graph)
-        output = tf.keras.layers.Concatenate(axis=-1)([output1, output2])
+
+    if graph_pooling in ['weighted', 'concat']:
+        graph_pooling = "mean|max_no_inf"
+    if graph_pooling == 'max':
+        graph_pooling = "max_no_inf"
+    output = tfgnn.keras.layers.Pool(tfgnn.CONTEXT, graph_pooling,
+                                     node_set_name=nodes_to_pool)(graph)
 
     if single_head_dense:
         output = dense_block(units=head_width,

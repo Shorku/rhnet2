@@ -75,29 +75,34 @@ def model_fit(schema_path: str,
             .batch(batch_size=batch_size).prefetch(1)
     else:
         val_data = None
-    model = neurom(schema_path,
-                   graph_kan=graph_kan,
-                   head_kan=head_kan,
-                   weighting_kan=weighting_kan,
-                   activation=activation,
-                   head_kernel_l2=head_kernel_l2,
-                   head_bias_l2=head_bias_l2,
-                   head_dropout=head_dropout,
-                   gnn_kernel_l2=gnn_kernel_l2,
-                   gnn_bias_l2=gnn_bias_l2,
-                   gnn_dropout=gnn_dropout,
-                   weighting_kernel_l2=weighting_kernel_l2,
-                   weighting_bias_l2=weighting_bias_l2,
-                   graph_depth=graph_depth,
-                   gnn_dense_depth=gnn_dense_depth,
-                   graph_pooling=graph_pooling,
-                   nodes_to_pool=nodes_to_pool,
-                   head_width=head_width,
-                   head_depth=head_depth,
-                   weighting_depth=weighting_depth,
-                   multi_target=multi_target,
-                   targets=targets,
-                   single_head_dense=single_head_dense)
+
+    params = {
+        'schema_path': schema_path,
+        'graph_kan': graph_kan,
+        'head_kan': head_kan,
+        'weighting_kan': weighting_kan,
+        'activation': activation,
+        'head_kernel_l2': head_kernel_l2,
+        'head_bias_l2': head_bias_l2,
+        'head_dropout': head_dropout,
+        'gnn_kernel_l2': gnn_kernel_l2,
+        'gnn_bias_l2': gnn_bias_l2,
+        'gnn_dropout': gnn_dropout,
+        'weighting_kernel_l2': weighting_kernel_l2,
+        'weighting_bias_l2': weighting_bias_l2,
+        'graph_depth': graph_depth,
+        'gnn_dense_depth': gnn_dense_depth,
+        'graph_pooling': graph_pooling,
+        'nodes_to_pool': nodes_to_pool,
+        'head_width': head_width,
+        'head_depth': head_depth,
+        'weighting_depth': weighting_depth,
+        'multi_target': multi_target,
+        'targets': targets,
+        'single_head_dense': single_head_dense}
+
+    model = neurom(**params)
+
     if learning_decay_rate:
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             learning_rate,
