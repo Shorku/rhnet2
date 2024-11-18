@@ -21,7 +21,8 @@ def neurom(schema_path: str,
            weighting_bias_l2: float = 0.0,
            graph_depth: int = 1,
            gnn_dense_depth: int = 1,
-           graph_pooling: str = "concat",
+           graph_pooling: str = "mean|max_no_inf",
+           prepool_scaling: bool = False,
            nodes_to_pool: str = "atom",
            head_width: int = 64,
            head_depth: int = 1,
@@ -30,10 +31,6 @@ def neurom(schema_path: str,
            targets: list = None,
            single_head_dense: bool = True):
 
-    assert graph_pooling in ['mean',
-                             'max',
-                             'concat',
-                             'weighted'], "Unrecognized graph pooling"
     graph_spec = read_schema(schema_path)
     targets = context_features(schema_path,
                                multi_target=multi_target,
@@ -57,6 +54,7 @@ def neurom(schema_path: str,
                                                depth=gnn_dense_depth,
                                                use_kan=graph_kan,
                                                activation=activation,
+                                               output_activation=activation,
                                                kernel_l2=gnn_kernel_l2,
                                                bias_l2=gnn_bias_l2,
                                                dropout=gnn_dropout),
@@ -71,6 +69,7 @@ def neurom(schema_path: str,
                                                depth=gnn_dense_depth,
                                                use_kan=graph_kan,
                                                activation=activation,
+                                               output_activation=activation,
                                                kernel_l2=gnn_kernel_l2,
                                                bias_l2=gnn_bias_l2,
                                                dropout=gnn_dropout),
@@ -81,11 +80,11 @@ def neurom(schema_path: str,
                                     depth=gnn_dense_depth,
                                     use_kan=graph_kan,
                                     activation=activation,
+                                    output_activation=activation,
                                     kernel_l2=gnn_kernel_l2,
                                     bias_l2=gnn_bias_l2,
                                     dropout=gnn_dropout)))})(graph)
-
-    if graph_pooling == 'weighted':
+    if prepool_scaling:
         graph = tfgnn.keras.layers.GraphUpdate(
             node_sets={
                 "atom": NodeSetScaler(
@@ -93,24 +92,20 @@ def neurom(schema_path: str,
                                 depth=weighting_depth,
                                 use_kan=weighting_kan,
                                 activation=activation,
+                                output_activation=None,
                                 kernel_l2=weighting_kernel_l2,
-                                bias_l2=weighting_bias_l2,
-                                single_digit_output=True),
+                                bias_l2=weighting_bias_l2),
                     node_input_feature=tfgnn.HIDDEN_STATE
                 )})(graph)
 
-    if graph_pooling in ['weighted', 'concat']:
-        graph_pooling = "mean|max_no_inf"
-    if graph_pooling == 'max':
-        graph_pooling = "max_no_inf"
     output = tfgnn.keras.layers.Pool(tfgnn.CONTEXT, graph_pooling,
                                      node_set_name=nodes_to_pool)(graph)
-
     if single_head_dense:
         output = dense_block(units=head_width,
                              depth=head_depth,
                              use_kan=head_kan,
                              activation=activation,
+                             output_activation=activation,
                              kernel_l2=head_kernel_l2,
                              bias_l2=head_bias_l2,
                              dropout=head_dropout)(output)
@@ -135,6 +130,7 @@ def neurom(schema_path: str,
                     depth=head_depth,
                     use_kan=head_kan,
                     activation=activation,
+                    output_activation=activation,
                     kernel_l2=head_kernel_l2,
                     bias_l2=head_bias_l2,
                     dropout=head_dropout)(output))

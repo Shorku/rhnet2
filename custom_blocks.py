@@ -83,10 +83,10 @@ def dense_block(units: int,
                 depth: int = 1,
                 use_kan: bool = False,
                 activation: str = 'elu',
+                output_activation: str = 'elu',
                 kernel_l2: float = 0.0,
                 bias_l2: float = 0.0,
-                dropout: float = 0.0,
-                single_digit_output: bool = False):
+                dropout: float = 0.0):
     if depth == 0:
         return tf.keras.Sequential([])
     layers = []
@@ -102,12 +102,12 @@ def dense_block(units: int,
             kernel_initializer=tf.keras.initializers.LecunNormal(),
             bias_initializer='zeros')
         )
-        if dropout and not use_kan:
+        if dropout:
             layers.append(tf.keras.layers.Dropout(rate=dropout))
     layers.append(DenseKAN(units) if use_kan
                   else tf.keras.layers.Dense(
-            1 if single_digit_output else units,
-            activation=None if single_digit_output else activation,
+            units,
+            activation=output_activation,
             kernel_regularizer=tf.keras.regularizers.l2(
                 kernel_l2) if kernel_l2 else None,
             bias_regularizer=tf.keras.regularizers.l2(
