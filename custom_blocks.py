@@ -102,15 +102,14 @@ def dense_block(units: int,
                 output_activation: str = 'elu',
                 kernel_l2: float = 0.0,
                 bias_l2: float = 0.0,
-                dropout: float = 0.0):
-    if depth == 0:
-        return tf.keras.Sequential([])
+                dropout: float = 0.0,
+                kan_grid_size: int = 5):
     layers = []
-    for i in range(depth - 1):
-        layers.append(DenseKAN(units) if use_kan else
+    for i in range(depth):
+        layers.append(DenseKAN(units, grid_size=kan_grid_size) if use_kan else
                       tf.keras.layers.Dense(
             units,
-            activation=activation,
+            activation=output_activation if i == (depth - 1) else activation,
             kernel_regularizer=tf.keras.regularizers.l2(
                 kernel_l2) if kernel_l2 else None,
             bias_regularizer=tf.keras.regularizers.l2(
@@ -118,17 +117,7 @@ def dense_block(units: int,
             kernel_initializer=tf.keras.initializers.LecunNormal(),
             bias_initializer='zeros')
         )
-        if dropout:
+        if dropout and i < depth - 1:
             layers.append(tf.keras.layers.Dropout(rate=dropout))
-    layers.append(DenseKAN(units) if use_kan
-                  else tf.keras.layers.Dense(
-            units,
-            activation=output_activation,
-            kernel_regularizer=tf.keras.regularizers.l2(
-                kernel_l2) if kernel_l2 else None,
-            bias_regularizer=tf.keras.regularizers.l2(
-                bias_l2) if bias_l2 else None,
-            kernel_initializer=tf.keras.initializers.LecunNormal(),
-            bias_initializer='zeros'))
 
     return tf.keras.Sequential(layers)
