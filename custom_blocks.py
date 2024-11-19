@@ -79,6 +79,22 @@ class NodeSetScaler(tf.keras.layers.Layer):
         return inputs
 
 
+class OuterProduct(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super(OuterProduct, self).__init__(**kwargs)
+
+    def call(self, inputs, *args, **kwargs):
+        outer_product = tf.matmul(tf.expand_dims(inputs, -1),
+                                  tf.expand_dims(inputs, 1))
+        flattened_product = tf.reshape(outer_product,
+                                       (tf.shape(inputs)[0], -1))
+        return flattened_product
+
+    def compute_output_shape(self, input_shape):
+
+        return input_shape[0], input_shape[1] * input_shape[1]
+
+
 def dense_block(units: int,
                 depth: int = 1,
                 use_kan: bool = False,

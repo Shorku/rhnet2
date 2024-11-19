@@ -3,7 +3,8 @@ import tensorflow_gnn as tfgnn
 
 from data_utils import read_schema, context_features
 from data_utils import init_node_state, init_edge_state, drop_features
-from custom_blocks import dense_block, ConvScaleByFeature, NodeSetScaler
+from custom_blocks import dense_block
+from custom_blocks import ConvScaleByFeature, NodeSetScaler, OuterProduct
 
 
 def neurom(schema_path: str,
@@ -24,8 +25,9 @@ def neurom(schema_path: str,
            graph_pooling: str = "mean|max_no_inf",
            prepool_scaling: bool = False,
            nodes_to_pool: str = "atom",
+           self_interaction: str = None,
            head_width: int = 64,
-           head_depth: int = 1,
+           head_depth: int = 0,
            weighting_depth: int = 2,
            multi_target: bool = False,
            targets: list = None,
@@ -100,6 +102,15 @@ def neurom(schema_path: str,
 
     output = tfgnn.keras.layers.Pool(tfgnn.CONTEXT, graph_pooling,
                                      node_set_name=nodes_to_pool)(graph)
+
+    if self_interaction:
+        if self_interaction == 'outer':
+            second_order_out = OuterProduct()(output)
+        else:
+            second_order_out = tf.keras.layers.Multiply()([output, output])
+        output = tf.keras.layers.Concatenate(axis=-1)([output,
+                                                       second_order_out])
+
     if single_head_dense:
         output = dense_block(units=head_width,
                              depth=head_depth,
