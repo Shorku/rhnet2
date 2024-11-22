@@ -154,6 +154,8 @@ def model_fit(schema_path: str,
 
 def loo_val(schema_path: str,
             train_data_path: str,
+            log_path: str,
+            run_id: str = '',
             train_records_list: list = None,
             graph_kan: bool = False,
             head_kan: bool = False,
@@ -192,7 +194,8 @@ def loo_val(schema_path: str,
             learning_decay_rate: float = 0.0,
             loss_weights: dict = None,
             verbose: str = "auto",
-            model_save_path: str = None):
+            models_save: bool = False,
+            test_data_path: str = None):
     if train_records_list:
         train_records_list = \
             [tfrecord for tfrecord in train_records_list
@@ -202,10 +205,21 @@ def loo_val(schema_path: str,
             [Path(fname).stem for fname in os.listdir(train_data_path)
              if fname.endswith('.tfrecord')]
     loo_history = {}
+    base_name = (
+        f'LOO_{run_id}_G{graph_depth}D{gnn_dense_depth}W{weighting_depth}'
+        f'Hd{head_depth}Hw{head_width}_'
+        f'GKAN{graph_kan}WKAN{weighting_kan}HKAN{head_kan}'
+        f'L2G{gnn_kernel_l2}L2H{head_kernel_l2}L2W{weighting_kernel_l2}_'
+        f'GNNdrop{gnn_dropout}Headdrop{head_dropout}_'
+        f'batch{batch_size}_lr{learning_rate}_'
+        f'activation{activation}_singleHead{single_head_dense}')
+    log_path = os.path.join(log_path, base_name)
+    os.makedirs(log_path, exist_ok=True)
+    csv_path = os.path.join(log_path, f'{base_name}.csv')
     for record in train_records_list:
         val_list = [record]
         train_list = [i for i in train_records_list if i != record]
-        history = model_fit(
+        history, model = model_fit(
             schema_path=schema_path,
             train_data_path=train_data_path,
             train_records_list=train_list,
@@ -248,10 +262,21 @@ def loo_val(schema_path: str,
             learning_decay_rate=learning_decay_rate,
             loss_weights=loss_weights,
             verbose=verbose,
-            model_save_path=os.path.join(model_save_path, record)
-            if model_save_path else None)[0].history
-        for key, value in history.items():
+            model_save_path=os.path.join(log_path,
+                                         f'Models_{base_name}',
+                                         record)
+            if models_save else None)
+        for key, value in history.history.items():
             loo_history[f'{record}.{key}'] = value
+        pd.DataFrame(loo_history).to_csv(csv_path, index=False)
+        if test_data_path:
+            predict_on_record(model=model,
+                              schema_path=schema_path,
+                              data_path=test_data_path,
+                              log_path=log_path,
+                              base_name=f'{base_name}_{record}',
+                              multi_target=multi_target,
+                              targets=targets)
         tf.keras.backend.clear_session()
     return loo_history
 
@@ -334,8 +359,10 @@ def ensemble_fit(schema_path: str,
     ensemble_history = {}
     base_name = (
         f'{run_id}_'
-        f'G{graph_depth}D{gnn_dense_depth}Hd{head_depth}Hw{head_width}_'
-        f'l2gnn{gnn_kernel_l2}l2head{head_kernel_l2}_'
+        f'G{graph_depth}D{gnn_dense_depth}W{weighting_depth}'
+        f'Hd{head_depth}Hw{head_width}_'
+        f'GKAN{graph_kan}WKAN{weighting_kan}HKAN{head_kan}_'
+        f'L2G{gnn_kernel_l2}L2H{head_kernel_l2}L2W{weighting_kernel_l2}_'
         f'GNNdrop{gnn_dropout}Headdrop{head_dropout}_'
         f'batch{batch_size}_lr{learning_rate}_'
         f'activation{activation}_singleHead{single_head_dense}')
