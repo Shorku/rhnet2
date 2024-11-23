@@ -103,10 +103,13 @@ def dense_block(units: int,
                 kernel_l2: float = 0.0,
                 bias_l2: float = 0.0,
                 dropout: float = 0.0,
-                kan_grid_size: int = 5):
+                kan_grid_size: int = 5,
+                spline_order: int = 3):
     layers = []
     for i in range(depth):
-        layers.append(DenseKAN(units, grid_size=kan_grid_size) if use_kan else
+        layers.append(DenseKAN(units,
+                               grid_size=kan_grid_size,
+                               spline_order=spline_order) if use_kan else
                       tf.keras.layers.Dense(
             units,
             activation=output_activation if i == (depth - 1) else activation,

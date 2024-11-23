@@ -12,6 +12,7 @@ def neurom(schema_path: str,
            head_kan: bool = False,
            weighting_kan: bool = False,
            kan_grid_size: int = 5,
+           kan_spline_order: int = 3,
            activation: str = "elu",
            head_kernel_l2: float = 0.0,
            head_bias_l2: float = 0.0,
@@ -61,7 +62,8 @@ def neurom(schema_path: str,
                                                kernel_l2=gnn_kernel_l2,
                                                bias_l2=gnn_bias_l2,
                                                dropout=gnn_dropout,
-                                               kan_grid_size=kan_grid_size),
+                                               kan_grid_size=kan_grid_size,
+                                               spline_order=kan_spline_order),
                         sender_edge_feature=tfgnn.HIDDEN_STATE,
                         receiver_tag=tfgnn.TARGET)},
                     tfgnn.keras.layers.SingleInputNextState())})(graph)
@@ -77,7 +79,8 @@ def neurom(schema_path: str,
                                                kernel_l2=gnn_kernel_l2,
                                                bias_l2=gnn_bias_l2,
                                                dropout=gnn_dropout,
-                                               kan_grid_size=kan_grid_size),
+                                               kan_grid_size=kan_grid_size,
+                                               spline_order=kan_spline_order),
                         sender_edge_feature=tfgnn.HIDDEN_STATE,
                         receiver_tag=tfgnn.TARGET)},
                     tfgnn.keras.layers.NextStateFromConcat(
@@ -89,7 +92,8 @@ def neurom(schema_path: str,
                                     kernel_l2=gnn_kernel_l2,
                                     bias_l2=gnn_bias_l2,
                                     dropout=gnn_dropout,
-                                    kan_grid_size=kan_grid_size)))})(graph)
+                                    kan_grid_size=kan_grid_size,
+                                    spline_order=kan_spline_order)))})(graph)
     if prepool_scaling:
         graph = tfgnn.keras.layers.GraphUpdate(
             node_sets={
@@ -101,7 +105,8 @@ def neurom(schema_path: str,
                                 output_activation=None,
                                 kernel_l2=weighting_kernel_l2,
                                 bias_l2=weighting_bias_l2,
-                                kan_grid_size=kan_grid_size),
+                                kan_grid_size=kan_grid_size,
+                                spline_order=kan_spline_order),
                     node_input_feature=tfgnn.HIDDEN_STATE
                 )})(graph)
 
@@ -125,7 +130,8 @@ def neurom(schema_path: str,
                              kernel_l2=head_kernel_l2,
                              bias_l2=head_bias_l2,
                              dropout=head_dropout,
-                             kan_grid_size=kan_grid_size)(output)
+                             kan_grid_size=kan_grid_size,
+                             spline_order=kan_spline_order)(output)
     outputs = []
     for target in targets:
         if single_head_dense:
@@ -151,7 +157,8 @@ def neurom(schema_path: str,
                     kernel_l2=head_kernel_l2,
                     bias_l2=head_bias_l2,
                     dropout=head_dropout,
-                    kan_grid_size=kan_grid_size)(output))
+                    kan_grid_size=kan_grid_size,
+                    spline_order=kan_spline_order)(output))
             outputs[-1] = tf.keras.layers.Dense(
                 units=1,
                 activation=None,
