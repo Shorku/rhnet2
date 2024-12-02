@@ -159,6 +159,7 @@ def loo_val(schema_path: str,
             log_path: str,
             run_id: str = '',
             train_records_list: list = None,
+            exclude_from_val: list = None,
             graph_kan: bool = False,
             head_kan: bool = False,
             weighting_kan: bool = False,
@@ -220,6 +221,8 @@ def loo_val(schema_path: str,
     os.makedirs(log_path, exist_ok=True)
     csv_path = os.path.join(log_path, f'{base_name}.csv')
     for record in train_records_list:
+        if exclude_from_val and record in exclude_from_val:
+            continue
         val_list = [record]
         train_list = [i for i in train_records_list if i != record]
         history, model = model_fit(
