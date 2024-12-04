@@ -63,6 +63,26 @@ PARSER.add_argument('--monolith_record', '--monolith',
                     action='store_true',
                     help="""Save everyting in a single tfrecord""")
 
+PARSER.add_argument('--aux_orca_outs',
+                    type=str,
+                    default=None,
+                    help="""Additional calculated data""")
+
+PARSER.add_argument('--aux_rot_aug',
+                    type=int,
+                    default=5,
+                    help="""Rotated structures in additional data""")
+
+PARSER.add_argument('--aux_overlap_thresh',
+                    type=float,
+                    default=0.19,
+                    help="""The number of rotated structures""")
+
+PARSER.add_argument('--aux_overlap_share',
+                    type=float,
+                    default=0.1,
+                    help="""The number of rotated structures""")
+
 
 def parse_args(flags):
     return Munch({
@@ -76,7 +96,11 @@ def parse_args(flags):
         'scalings_csv': flags.scalings_csv,
         'rot_aug': flags.rot_aug,
         'multi_target': flags.multi_target,
-        'monolith': flags.monolith
+        'monolith': flags.monolith,
+        'aux_orca_outs': flags.aux_orca_outs,
+        'aux_rot_aug': flags.aux_rot_aug,
+        'aux_overlap_thresh': flags.aux_overlap_thresh,
+        'aux_overlap_share': flags.aux_overlap_share,
     })
 
 
@@ -89,8 +113,14 @@ def setup(params=None):
 
 def main():
     params = setup()
+    orca_outs = [params.orca_outs]
+    rot_augs = [params.rot_aug]
+    if params.aux_orca_outs:
+        orca_outs += [params.aux_orca_outs]
+        rot_augs += [params.aux_rot_aug]
+
     serialize_from_orca(csv_path=params.data_csv,
-                        orca_out_path=params.orca_outs,
+                        orca_out_paths=orca_outs,
                         overlap_thresh=params.overlap_thresh,
                         save_path=params.save_path,
                         record_name=params.record_name,
@@ -98,8 +128,10 @@ def main():
                         scalings_csv_path=params.scalings_csv,
                         monolith=params.monolith,
                         multi_target=params.multi_target,
-                        rot_aug=params.rot_aug,
-                        gepol_path=params.gepol_path)
+                        rot_augs=rot_augs,
+                        gepol_path=params.gepol_path,
+                        aux_overlap_thresh=params.aux_overlap_thresh,
+                        aux_overlap_share=params.aux_overlap_share)
 
 
 if __name__ == '__main__':

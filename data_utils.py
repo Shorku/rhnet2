@@ -199,15 +199,17 @@ def graph_from_orca(out_file: str,
 
 
 def tfrecord_from_orca(data_df: pd.DataFrame,
-                       orca_out_path: str,
+                       orca_out_paths: list,
                        overlap_thresh: float,
                        save_path: str,
                        record_name: str,
                        targets: list,
                        scalings: dict,
-                       rot_aug: int = 1,
+                       rot_augs: list = (1,),
                        gepol_path: str = '',
-                       dummy: bool = False):
+                       dummy: bool = False,
+                       aux_overlap_thresh: float = None,
+                       aux_overlap_share: float = 0):
     record_path = os.path.join(save_path, f'{record_name}.tfrecord')
     record_options = tf.io.TFRecordOptions(compression_type='GZIP')
 
@@ -232,27 +234,40 @@ def tfrecord_from_orca(data_df: pd.DataFrame,
             isomer = row['isomer_id']
             nconf = row['nconf']
             for conf in range(1, nconf + 1):
-                prop_out_file = os.path.join(orca_out_path,
-                                             f'{isomer}_{conf}_1_dft.zip')
-                target_features = context_features_values(row,
-                                                          prop_out_file,
-                                                          targets,
-                                                          scalings)
-                for aug in range(1, rot_aug + 1):
-                    out_file = os.path.join(orca_out_path,
-                                            f'{isomer}_{conf}_{aug}.zip')
-                    graph, nbas = graph_from_orca(out_file,
-                                                  overlap_thresh,
-                                                  target_features,
-                                                  dummy=dummy)
-                    example = tfgnn.write_example(graph)
-                    writer.write(example.SerializeToString())
+                for orca_out_path, rot_aug in zip(orca_out_paths, rot_augs):
+                    prop_out_file = os.path.join(orca_out_path,
+                                                 f'{isomer}_{conf}_1_dft.zip')
+                    target_features = context_features_values(row,
+                                                              prop_out_file,
+                                                              targets,
+                                                              scalings)
+                    for aug in range(1, rot_aug + 1):
+                        out_file = os.path.join(orca_out_path,
+                                                f'{isomer}_{conf}_{aug}.zip')
+                        graph, nbas = graph_from_orca(out_file,
+                                                      overlap_thresh,
+                                                      target_features,
+                                                      dummy=dummy)
+                        example = tfgnn.write_example(graph)
+                        writer.write(example.SerializeToString())
+                    if aux_overlap_thresh and aux_overlap_share * rot_aug >= 1:
+                        for aug in range(1,
+                                         int(rot_aug * aux_overlap_share) + 1):
+                            out_file = os.path.join(
+                                orca_out_path,
+                                f'{isomer}_{conf}_{aug}.zip')
+                            graph, nbas = graph_from_orca(out_file,
+                                                          aux_overlap_thresh,
+                                                          target_features,
+                                                          dummy=dummy)
+                            example = tfgnn.write_example(graph)
+                            writer.write(example.SerializeToString())
 
     return nbas
 
 
 def serialize_from_orca(csv_path: str,
-                        orca_out_path: str,
+                        orca_out_paths: list,
                         overlap_thresh: float,
                         save_path: str,
                         record_name: str,
@@ -260,9 +275,11 @@ def serialize_from_orca(csv_path: str,
                         scalings_csv_path: str = '',
                         monolith: bool = True,
                         multi_target: bool = False,
-                        rot_aug: int = 1,
+                        rot_augs: list = (1,),
                         gepol_path: str = '',
-                        dummy: bool = False):
+                        dummy: bool = False,
+                        aux_overlap_thresh: float = None,
+                        aux_overlap_share: float = 0):
     data_df = pd.read_csv(csv_path)
     os.makedirs(os.path.join(save_path, record_name), exist_ok=True)
     targets = \
@@ -276,28 +293,32 @@ def serialize_from_orca(csv_path: str,
         scalings = {}
     if monolith:
         nbas = tfrecord_from_orca(data_df=data_df,
-                                  orca_out_path=orca_out_path,
+                                  orca_out_paths=orca_out_paths,
                                   overlap_thresh=overlap_thresh,
                                   save_path=os.path.join(save_path,
                                                          record_name),
                                   record_name=record_name,
                                   targets=targets,
                                   scalings=scalings,
-                                  rot_aug=rot_aug,
+                                  rot_augs=rot_augs,
                                   gepol_path=gepol_path,
-                                  dummy=dummy)
+                                  dummy=dummy,
+                                  aux_overlap_thresh=aux_overlap_thresh,
+                                  aux_overlap_share=aux_overlap_share)
     else:
         for cas in data_df['cas'].unique():
             nbas = tfrecord_from_orca(data_df=data_df[data_df['cas'] == cas],
-                                      orca_out_path=orca_out_path,
+                                      orca_out_paths=orca_out_paths,
                                       overlap_thresh=overlap_thresh,
                                       save_path=os.path.join(save_path,
                                                              record_name),
                                       record_name=cas,
                                       targets=targets,
                                       scalings=scalings,
-                                      rot_aug=rot_aug,
+                                      rot_augs=rot_augs,
                                       gepol_path=gepol_path,
-                                      dummy=dummy)
+                                      dummy=dummy,
+                                      aux_overlap_thresh=aux_overlap_thresh,
+                                      aux_overlap_share=aux_overlap_share)
     save_schema(nbas, schema_template_path,
                 os.path.join(save_path, f'{record_name}.pbtxt'))
