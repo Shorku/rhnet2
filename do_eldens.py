@@ -6,7 +6,7 @@ import pandas as pd
 
 from munch import Munch
 
-from qchem_data_utils import split_to_atoms, rotate_geom
+from qchem_data_utils import split_to_atoms, rotate_geom, orca_out_not_ok
 from qchem_run_utils import orca_runner, orca_cleanup
 
 
@@ -84,15 +84,25 @@ def single_single_point(base: str, aug_id: int, atoms: list, coords: list,
                         params: Munch):
     aug_geom = rotate_geom(atoms, coords)
     aug_base = f'{base}_{aug_id}'
-    dft_inp = dft_template.format(aug_geom)
-    dmt_inp = dmt_template.format(f'{aug_base}_dft', basis_block, aug_geom)
-    with open(os.path.join(params.work_dir, f'{aug_base}_dft.inp'), 'w') as f:
-        f.write(dft_inp)
-    with open(os.path.join(params.work_dir, f'{aug_base}.inp'), 'w') as f:
-        f.write(dmt_inp)
-    orca_runner([f'{aug_base}_dft'], params.work_dir, params.orca_path)
-    orca_runner([f'{aug_base}'], params.work_dir, params.orca_path)
-    orca_cleanup([f'{aug_base}_dft'], [f'{aug_base}'], params.work_dir)
+    dft_is_not_ok = orca_out_not_ok(os.path.join(params.work_dir,
+                                                 f'{aug_base}_dft.zip'))
+    while dft_is_not_ok:
+        dft_inp = dft_template.format(aug_geom)
+        dmt_inp = dmt_template.format(f'{aug_base}_dft', basis_block, aug_geom)
+        with open(os.path.join(params.work_dir,
+                               f'{aug_base}_dft.inp'), 'w') as f:
+            f.write(dft_inp)
+        with open(os.path.join(params.work_dir,
+                               f'{aug_base}.inp'), 'w') as f:
+            f.write(dmt_inp)
+        orca_runner([f'{aug_base}_dft'], params.work_dir, params.orca_path)
+        dft_is_not_ok = orca_out_not_ok(os.path.join(params.work_dir,
+                                                     f'{aug_base}_dft.out'))
+        if dft_is_not_ok:
+            continue
+        else:
+            orca_runner([f'{aug_base}'], params.work_dir, params.orca_path)
+            orca_cleanup([f'{aug_base}_dft'], [f'{aug_base}'], params.work_dir)
 
 
 def single_points(params: Munch):

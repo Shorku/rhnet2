@@ -5,7 +5,7 @@ import pandas as pd
 
 from munch import Munch
 
-from qchem_data_utils import check_out_termination_failure
+from qchem_data_utils import orca_out_not_ok
 
 
 PARSER = argparse.ArgumentParser(description="check_orca_logs")
@@ -44,27 +44,16 @@ def main():
             base = f'{isomer_id}_{conf}'
             for rot_aug in range(1, params.rot_aug + 1):
                 fname = f'{base}_{rot_aug}_dft.zip'
-                if not os.path.isfile(os.path.join(params.orca_outs, fname)):
-                    dft_calc_failed = True
-                else:
-                    dft_calc_failed = check_out_termination_failure(
-                        os.path.join(params.orca_outs, fname))
-                if dft_calc_failed:
+                if orca_out_not_ok(os.path.join(params.orca_outs, fname)):
                     with open(os.path.join(params.orca_outs,
                                            'sanity_check.log'), 'a') as f:
-                        f.write(fname)
+                        f.write(f'{fname}\n')
                 else:
                     fname = f'{base}_{rot_aug}.zip'
-                    if not os.path.isfile(
-                            os.path.join(params.orca_outs, fname)):
-                        dmt_calc_failed = True
-                    else:
-                        dmt_calc_failed = check_out_termination_failure(
-                            os.path.join(params.orca_outs, fname))
-                    if dmt_calc_failed:
+                    if orca_out_not_ok(os.path.join(params.orca_outs, fname)):
                         with open(os.path.join(params.orca_outs,
                                                'sanity_check.log'), 'a') as f:
-                            f.write(fname)
+                            f.write(f'{fname}\n')
 
 
 if __name__ == '__main__':

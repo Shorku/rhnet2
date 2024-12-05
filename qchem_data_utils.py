@@ -37,7 +37,9 @@ def rotate_geom(atoms: list, coords: list):
 ###############################################################################
 # ORCA outputs parsing utilities
 ###############################################################################
-def check_out_termination_failure(out_file: str):
+def orca_out_not_ok(out_file: str):
+    if not os.path.isfile(out_file):
+        return True
     if out_file.endswith('.zip'):
         z = zipfile.ZipFile(out_file)
         fname = f'{pathlib.Path(out_file).stem}.out'
