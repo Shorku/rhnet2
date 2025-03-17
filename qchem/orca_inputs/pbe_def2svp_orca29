@@ -1,0 +1,9 @@
+! RKS PBE def2-svp def2-svp/j
+%coords
+CTyp xyz
+Charge 0
+Mult 1
+coords
+{}
+end
+end
