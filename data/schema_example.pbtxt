@@ -1,0 +1,113 @@
+context {
+  features {
+    key: "target"
+    value: {
+      description: "Value to be predicted"
+      dtype: DT_FLOAT
+      shape { dim { size: 1 } }
+    }
+  }
+  features {
+    key: "melt"
+    value: {
+      description: "Tm"
+      dtype: DT_FLOAT
+      shape { dim { size: 1 } }
+    }
+  }
+  features {
+    key: "logk"
+    value: {
+      description: "LogKow"
+      dtype: DT_FLOAT
+      shape { dim { size: 1 } }
+    }
+  }
+  features {
+    key: "dipole"
+    value: {
+      description: "Dipole magnitude (a.u.)"
+      dtype: DT_FLOAT
+      shape { dim { size: 1 } }
+    }
+  }
+  features {
+    key: "vol"
+    value: {
+      description: "Molecular volume"
+      dtype: DT_FLOAT
+      shape { dim { size: 1 } }
+    }
+  }
+  features {
+    key: "surf"
+    value: {
+      description: "Molecular surface"
+      dtype: DT_FLOAT
+      shape { dim { size: 1 } }
+    }
+  }
+}
+node_sets {
+  key: "atom"
+  value {
+    description: "Atoms in molecule"
+    features {
+      key: "density"
+      value: {
+        dtype: DT_FLOAT
+        shape: { dim: { size: 45 } }
+      }
+    }
+    features {
+      key: "nuc_charge"
+      value: {
+        dtype: DT_FLOAT
+        shape: { dim: { size: 1 } }
+      }
+    }
+  }
+}
+node_sets {
+  key: "link"
+  value {
+    description: "Overlaps between atoms in molecule"
+    features {
+      key: "density"
+      value: {
+        dtype: DT_FLOAT
+        shape: { dim: { size: 81 } }
+      }
+    }
+  }
+}
+edge_sets {
+  key: "atom2link"
+  value {
+    description: "Connects atoms with links"
+    source: "atom"
+    target: "link"
+    features {
+      key: "overlap"
+      value: {
+        dtype: DT_FLOAT
+        shape: { dim: { size: 81 } }
+      }
+    }
+  }
+}
+edge_sets {
+  key: "link2atom"
+  value {
+    description: "Connects links with atoms"
+    source: "link"
+    target: "atom"
+    features {
+      key: "overlap"
+      value: {
+        dtype: DT_FLOAT
+        shape: { dim: { size: 81 } }
+      }
+    }
+  }
+}
