@@ -199,7 +199,8 @@ def loo_val(schema_path: str,
             loss_weights: dict = None,
             verbose: str = "auto",
             models_save: bool = False,
-            test_data_path: str = None):
+            test_data_path: str = None,
+            maxiter=999):
     if train_records_list:
         train_records_list = \
             [tfrecord for tfrecord in train_records_list
@@ -220,7 +221,10 @@ def loo_val(schema_path: str,
     log_path = os.path.join(log_path, base_name)
     os.makedirs(log_path, exist_ok=True)
     csv_path = os.path.join(log_path, f'{base_name}.csv')
+    iteration = 1
     for record in train_records_list:
+        if iteration > maxiter:
+            break
         if exclude_from_val and record in exclude_from_val:
             continue
         val_list = [record]
@@ -285,6 +289,7 @@ def loo_val(schema_path: str,
                               multi_target=multi_target,
                               targets=targets)
         tf.keras.backend.clear_session()
+        iteration += 1
     return loo_history
 
 
@@ -323,9 +328,11 @@ def ensemble_fit(schema_path: str,
                  run_id: str = '',
                  predict_on_train: bool = True,
                  predict_on_val: bool = True,
+                 predict_on_test: bool = False,
                  train_records_list: list = None,
                  val_data_path: str = None,
                  val_records_list: list = None,
+                 test_data_path: str = None,
                  graph_kan: bool = False,
                  head_kan: bool = False,
                  weighting_kan: bool = False,
@@ -441,6 +448,14 @@ def ensemble_fit(schema_path: str,
             predict_on_record(model=model,
                               schema_path=schema_path,
                               data_path=val_data_path,
+                              log_path=log_path,
+                              base_name=f'{base_name}_model{n}',
+                              multi_target=multi_target,
+                              targets=targets)
+        if predict_on_test:
+            predict_on_record(model=model,
+                              schema_path=schema_path,
+                              data_path=test_data_path,
                               log_path=log_path,
                               base_name=f'{base_name}_model{n}',
                               multi_target=multi_target,
