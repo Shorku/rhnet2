@@ -5,6 +5,9 @@ paper.
 
 <img src="images/intro.jpg" width="801" alt="302">
 
+## Overview
+🚧 🛠️ 🚧
+
 ## Input Data
 ### Quantum Chemical Data
 Prepare quantum chemical data:
@@ -13,10 +16,24 @@ python3 doeldens.py --data_csv data/sl1_train_data.csv --work_dir data/temp --co
 ```
 
 ### Graph Data
-Prepare graphs and save them in tfrecords format:
+<img src="images/graph.jpg" width="800" alt="537">
+
+Prepare graphs and save them in .tfrecord format:
 ```shell
 python3 do_tfrecords.py --record_name train --data_csv data/sl1_train_data.csv --orca_outs data/temp --overlap_thresh 0.035 --save_path data/tfrecords --gepol_path <gepol_path> --schema_path schema_template --scalings_csv scalings.csv --rot_aug 50 --multi_target
 ```
+
+**Note**, for inference, graphs and TF-GNN module are not needed. The results of 
+quantum chemical calculations can be directly parsed into TF tensors suitable 
+for inference. See an example on 
+[GitHub](https://github.com/Shorku/SolubilityChallenge2008/blob/main/rhnet2.ipynb) 
+and [Hugging Face](https://huggingface.co/Shorku/RhNet2SC1/blob/main/RhNet2SC1.ipynb)
+
+### Tabular Data (for training)
+🚧 🛠️ 🚧
+
+## Model Fit
+🚧 🛠️ 🚧
 
 ## Inference
 Models trained to predict aqueous solubility under Solubility Challenge (2008)
