@@ -83,6 +83,11 @@ PARSER.add_argument('--aux_overlap_share',
                     default=0.1,
                     help="""The number of rotated structures""")
 
+PARSER.add_argument('--rot_from_csv',
+                    dest='rot_from_csv',
+                    action='store_true',
+                    help="""Individual number of rotated structures""")
+
 
 def parse_args(flags):
     return Munch({
@@ -101,6 +106,7 @@ def parse_args(flags):
         'aux_rot_aug': flags.aux_rot_aug,
         'aux_overlap_thresh': flags.aux_overlap_thresh,
         'aux_overlap_share': flags.aux_overlap_share,
+        'rot_from_csv': flags.rot_from_csv,
     })
 
 
@@ -131,7 +137,8 @@ def main():
                         rot_augs=rot_augs,
                         gepol_path=params.gepol_path,
                         aux_overlap_thresh=params.aux_overlap_thresh,
-                        aux_overlap_share=params.aux_overlap_share)
+                        aux_overlap_share=params.aux_overlap_share,
+                        rot_from_csv=params.rot_from_csv)
 
 
 if __name__ == '__main__':

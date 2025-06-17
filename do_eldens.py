@@ -1,5 +1,7 @@
 import os
+import time
 import argparse
+import datetime
 import concurrent.futures
 
 import pandas as pd
@@ -57,6 +59,11 @@ PARSER.add_argument('--pal',
                     default=1,
                     help="""The number of CPU cores to use""")
 
+PARSER.add_argument('--rot_from_csv',
+                    dest='rot_from_csv',
+                    action='store_true',
+                    help="""Individual number of rotated structures""")
+
 
 def parse_args(flags):
     return Munch({
@@ -68,7 +75,8 @@ def parse_args(flags):
         'dft_inp_path': flags.dft_inp_path,
         'dmt_inp_path': flags.dmt_inp_path,
         'rot_aug': flags.rot_aug,
-        'pal': flags.pal
+        'pal': flags.pal,
+        'rot_from_csv': flags.rot_from_csv,
     })
 
 
@@ -116,9 +124,12 @@ def single_points(params: Munch):
     with concurrent.futures.ThreadPoolExecutor(
             max_workers=params.pal) as executor:
         futures = []
-        for idx, isomer in data_df.iterrows():
-            isomer_id = isomer['isomer_id']
-            nconf = isomer['nconf']
+        # for idx, isomer in data_df.iterrows():
+        for row in data_df.itertuples():
+            isomer_id = row._asdict()['isomer_id']
+            nconf = row._asdict()['nconf']
+            if params.rot_from_csv:
+                params.rot_aug = row._asdict()['rot']
             for conf in range(1, nconf + 1):
                 base = f'{isomer_id}_{conf}'
                 conf_file = os.path.join(params.conf_dir,
@@ -143,8 +154,11 @@ def single_points(params: Munch):
 
 
 def main():
+    start = time.time()
     params = setup()
     single_points(params)
+    wt = str(datetime.timedelta(seconds=round(time.time() - start)))
+    print(f'Wall time: {wt}')
 
 
 if __name__ == '__main__':

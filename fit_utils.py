@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import pandas as pd
 import tensorflow as tf
 
@@ -30,6 +31,7 @@ def model_fit(schema_path: str,
               gnn_bias_l2: float = 0.0,
               weighting_kernel_l2: float = 0.0,
               weighting_bias_l2: float = 0.0,
+              weighting_dropout: float = 0.0,
               graph_depth: int = 1,
               gnn_dense_depth: int = 1,
               graph_pooling: str = "mean|max_no_inf",
@@ -96,6 +98,7 @@ def model_fit(schema_path: str,
         'gnn_dropout': gnn_dropout,
         'weighting_kernel_l2': weighting_kernel_l2,
         'weighting_bias_l2': weighting_bias_l2,
+        'weighting_dropout': weighting_dropout,
         'graph_depth': graph_depth,
         'gnn_dense_depth': gnn_dense_depth,
         'graph_pooling': graph_pooling,
@@ -174,6 +177,7 @@ def loo_val(schema_path: str,
             gnn_bias_l2: float = 0.0,
             weighting_kernel_l2: float = 0.0,
             weighting_bias_l2: float = 0.0,
+            weighting_dropout: float = 0.0,
             graph_depth: int = 1,
             gnn_dense_depth: int = 1,
             graph_pooling: str = "mean|max_no_inf",
@@ -249,6 +253,7 @@ def loo_val(schema_path: str,
             gnn_bias_l2=gnn_bias_l2,
             weighting_kernel_l2=weighting_kernel_l2,
             weighting_bias_l2=weighting_bias_l2,
+            weighting_dropout=weighting_dropout,
             graph_depth=graph_depth,
             gnn_dense_depth=gnn_dense_depth,
             graph_pooling=graph_pooling,
@@ -347,6 +352,7 @@ def ensemble_fit(schema_path: str,
                  gnn_bias_l2: float = 0.0,
                  weighting_kernel_l2: float = 0.0,
                  weighting_bias_l2: float = 0.0,
+                 weighting_dropout: float = 0.0,
                  graph_depth: int = 1,
                  gnn_dense_depth: int = 1,
                  graph_pooling: str = "mean|max_no_inf",
@@ -404,6 +410,7 @@ def ensemble_fit(schema_path: str,
             gnn_bias_l2=gnn_bias_l2,
             weighting_kernel_l2=weighting_kernel_l2,
             weighting_bias_l2=weighting_bias_l2,
+            weighting_dropout=weighting_dropout,
             graph_depth=graph_depth,
             gnn_dense_depth=gnn_dense_depth,
             graph_pooling=graph_pooling,
@@ -462,3 +469,133 @@ def ensemble_fit(schema_path: str,
                               targets=targets)
         tf.keras.backend.clear_session()
     return base_name
+
+
+def kfold_val(schema_path: str,
+              train_data_path: str,
+              log_path: str,
+              folds_k: int = 10,
+              shuffle_folds: bool = True,
+              run_id: str = '',
+              train_records_list: list = None,
+              graph_kan: bool = False,
+              head_kan: bool = False,
+              weighting_kan: bool = False,
+              kan_grid_size: int = 5,
+              kan_spline_order: int = 3,
+              activation: str = "elu",
+              head_kernel_l2: float = 0.0,
+              head_bias_l2: float = 0.0,
+              head_dropout: float = 0.25,
+              gnn_dropout: float = 0.0,
+              gnn_kernel_l2: float = 0.0,
+              gnn_bias_l2: float = 0.0,
+              weighting_kernel_l2: float = 0.0,
+              weighting_bias_l2: float = 0.0,
+              weighting_dropout: float = 0.0,
+              graph_depth: int = 1,
+              gnn_dense_depth: int = 1,
+              graph_pooling: str = "mean|max_no_inf",
+              prepool_scaling: bool = False,
+              nodes_to_pool: str = "atom",
+              self_interaction: str = None,
+              head_width: int = 64,
+              head_depth: int = 1,
+              weighting_depth: int = 0,
+              multi_target: bool = False,
+              targets: list = None,
+              single_head_dense: bool = True,
+              noise_stddev: dict = None,
+              shuffle_buffer: dict = None,
+              compression_type: str = 'GZIP',
+              batch_size: int = 16,
+              epochs: int = 10,
+              steps_per_epoch: int = 100,
+              validation_steps: int = 100,
+              learning_rate: float = 5e-6,
+              learning_rate_decay_steps: int = 50,
+              learning_decay_rate: float = 0.0,
+              loss_weights: dict = None,
+              verbose: str = "auto"):
+    if train_records_list:
+        train_records_list = \
+            [tfrecord for tfrecord in train_records_list
+             if f'{tfrecord}.tfrecord' in list(os.listdir(train_data_path))]
+    else:
+        train_records_list = \
+            [Path(fname).stem for fname in os.listdir(train_data_path)
+             if fname.endswith('.tfrecord')]
+    kfold_history = {}
+    base_name = (
+        f'KFOLD_{run_id}_G{graph_depth}D{gnn_dense_depth}W{weighting_depth}'
+        f'Hd{head_depth}Hw{head_width}_'
+        f'GKAN{graph_kan}WKAN{weighting_kan}HKAN{head_kan}'
+        f'L2G{gnn_kernel_l2}L2H{head_kernel_l2}L2W{weighting_kernel_l2}_'
+        f'GNNdrop{gnn_dropout}Headdrop{head_dropout}_'
+        f'batch{batch_size}_lr{learning_rate}_'
+        f'activation{activation}_singleHead{single_head_dense}')
+    log_path = os.path.join(log_path, base_name)
+    os.makedirs(log_path, exist_ok=True)
+    csv_path = os.path.join(log_path, f'{base_name}.csv')
+    train_records_list = np.array(train_records_list)
+    if shuffle_folds:
+        records_folds = \
+            np.array_split(np.random.permutation(train_records_list), folds_k)
+    else:
+        records_folds = \
+            np.array_split(train_records_list, folds_k)
+    for fold in range(folds_k):
+        val_list = records_folds[fold].tolist()
+        train_list = \
+            np.concatenate([records_folds[i] for i in range(folds_k)
+                            if i != fold]).tolist()
+        history, model = model_fit(
+            schema_path=schema_path,
+            train_data_path=train_data_path,
+            train_records_list=train_list,
+            val_data_path=train_data_path,
+            val_records_list=val_list,
+            graph_kan=graph_kan,
+            head_kan=head_kan,
+            weighting_kan=weighting_kan,
+            kan_grid_size=kan_grid_size,
+            kan_spline_order=kan_spline_order,
+            activation=activation,
+            head_kernel_l2=head_kernel_l2,
+            head_bias_l2=head_bias_l2,
+            head_dropout=head_dropout,
+            gnn_dropout=gnn_dropout,
+            gnn_kernel_l2=gnn_kernel_l2,
+            gnn_bias_l2=gnn_bias_l2,
+            weighting_kernel_l2=weighting_kernel_l2,
+            weighting_bias_l2=weighting_bias_l2,
+            weighting_dropout=weighting_dropout,
+            graph_depth=graph_depth,
+            gnn_dense_depth=gnn_dense_depth,
+            graph_pooling=graph_pooling,
+            prepool_scaling=prepool_scaling,
+            nodes_to_pool=nodes_to_pool,
+            self_interaction=self_interaction,
+            head_width=head_width,
+            head_depth=head_depth,
+            weighting_depth=weighting_depth,
+            multi_target=multi_target,
+            targets=targets,
+            single_head_dense=single_head_dense,
+            noise_stddev=noise_stddev,
+            shuffle_buffer=shuffle_buffer,
+            compression_type=compression_type,
+            batch_size=batch_size,
+            epochs=epochs,
+            steps_per_epoch=steps_per_epoch,
+            validation_steps=validation_steps,
+            learning_rate=learning_rate,
+            learning_rate_decay_steps=learning_rate_decay_steps,
+            learning_decay_rate=learning_decay_rate,
+            loss_weights=loss_weights,
+            verbose=verbose)
+        for key, value in history.history.items():
+            kfold_history[f'fold{fold}.{key}'] = value
+        pd.DataFrame(kfold_history).to_csv(csv_path, index=False)
+        tf.keras.backend.clear_session()
+    return kfold_history

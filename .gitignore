@@ -76,8 +76,8 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
-#.ipynb
-#*.ipynb
+.ipynb
+*.ipynb
 
 # IPython
 profile_default/
@@ -131,3 +131,5 @@ dmypy.json
 .pyre/
 
 .python-version
+/temp/
+/test_data/

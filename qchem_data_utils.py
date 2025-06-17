@@ -41,12 +41,15 @@ def orca_out_not_ok(out_file: str):
     if not os.path.isfile(out_file):
         return True
     if out_file.endswith('.zip'):
-        z = zipfile.ZipFile(out_file)
-        fname = f'{pathlib.Path(out_file).stem}.out'
-        if fname not in z.namelist():
-            z.close()
+        try:
+            z = zipfile.ZipFile(out_file)
+            fname = f'{pathlib.Path(out_file).stem}.out'
+            if fname not in z.namelist():
+                z.close()
+                return True
+            f = io.TextIOWrapper(z.open(fname), encoding='utf-8')
+        except zipfile.BadZipFile:
             return True
-        f = io.TextIOWrapper(z.open(fname), encoding='utf-8')
     else:
         f = open(out_file)
     contents = f.readlines()
@@ -104,13 +107,16 @@ def dipole_from_orca_out(out_file: str):
 
 def gepol_xyzr(geom: str):
     # from https://doi.org/10.1021/jp8111556
-    vwrad = {'O': 1.52,
-             'N': 1.55,
-             'F': 1.47,
-             'S': 1.80,
-             'C': 1.70,
-             'H': 1.10,
-             'Cl': 1.75}
+    vwrad = {'O':  1.52,
+             'N':  1.55,
+             'F':  1.47,
+             'S':  1.80,
+             'C':  1.70,
+             'H':  1.10,
+             'Cl': 1.75,
+             'B':  1.92,
+             'Si': 2.10,
+             'P':  1.80}
     geom_lines = geom.split("\n")
     new_geom = f'{len(geom_lines):>8}\n'
     for i, line in enumerate(geom_lines):
@@ -185,12 +191,17 @@ def matrices_from_orca(out_file: str, dummy: bool = False):
         return dm, ovrlp, atoms, coords, nbas_tot, natoms
 
     supported_orca_versions = \
-        ['2.9.1', '5.0.0', '5.0.1', '5.0.2', '5.0.3', '5.0.4']
+        ['2.9.1',
+         '5.0.0', '5.0.1', '5.0.2', '5.0.3', '5.0.4',
+         '6.0.0', '6.0.1']
     charg = {'H':   1.0,
+             'B':   5.0,
              'C':   6.0,
              'N':   7.0,
              'O':   8.0,
              'F':   9.0,
+             'Si': 14.0,
+             'P':  15.0,
              'S':  16.0,
              'Cl': 17.0}
     nbas_tot = 0

@@ -209,10 +209,10 @@ def tfrecord_from_orca(data_df: pd.DataFrame,
                        gepol_path: str = '',
                        dummy: bool = False,
                        aux_overlap_thresh: float = None,
-                       aux_overlap_share: float = 0):
+                       aux_overlap_share: float = 0,
+                       rot_from_csv: bool = False):
     record_path = os.path.join(save_path, f'{record_name}.tfrecord')
     record_options = tf.io.TFRecordOptions(compression_type='GZIP')
-
     target_functions_dict = {'dipole': dipole_from_orca_out,
                              'vol': functools.partial(vol_from_orca_out,
                                                       gepol_path=gepol_path,
@@ -230,14 +230,16 @@ def tfrecord_from_orca(data_df: pd.DataFrame,
         return target_values
 
     with tf.io.TFRecordWriter(record_path, options=record_options) as writer:
-        for idx, row in data_df.iterrows():
-            isomer = row['isomer_id']
-            nconf = row['nconf']
-            for conf in range(1, nconf + 1):
+        for row in data_df.itertuples():
+            isomer = row._asdict()['isomer_id']
+            nconf = row._asdict()['nconf']
+            if rot_from_csv:
+                rot_augs[0] = row._asdict()['rot']
+            for conf in range(1, int(nconf) + 1):
                 for orca_out_path, rot_aug in zip(orca_out_paths, rot_augs):
                     prop_out_file = os.path.join(orca_out_path,
                                                  f'{isomer}_{conf}_1_dft.zip')
-                    target_features = context_features_values(row,
+                    target_features = context_features_values(row._asdict(),
                                                               prop_out_file,
                                                               targets,
                                                               scalings)
@@ -279,7 +281,8 @@ def serialize_from_orca(csv_path: str,
                         gepol_path: str = '',
                         dummy: bool = False,
                         aux_overlap_thresh: float = None,
-                        aux_overlap_share: float = 0):
+                        aux_overlap_share: float = 0,
+                        rot_from_csv: bool = False):
     data_df = pd.read_csv(csv_path)
     os.makedirs(os.path.join(save_path, record_name), exist_ok=True)
     targets = \
@@ -304,7 +307,8 @@ def serialize_from_orca(csv_path: str,
                                   gepol_path=gepol_path,
                                   dummy=dummy,
                                   aux_overlap_thresh=aux_overlap_thresh,
-                                  aux_overlap_share=aux_overlap_share)
+                                  aux_overlap_share=aux_overlap_share,
+                                  rot_from_csv=rot_from_csv)
     else:
         for cas in data_df['cas'].unique():
             nbas = tfrecord_from_orca(data_df=data_df[data_df['cas'] == cas],
@@ -319,6 +323,7 @@ def serialize_from_orca(csv_path: str,
                                       gepol_path=gepol_path,
                                       dummy=dummy,
                                       aux_overlap_thresh=aux_overlap_thresh,
-                                      aux_overlap_share=aux_overlap_share)
+                                      aux_overlap_share=aux_overlap_share,
+                                      rot_from_csv=rot_from_csv)
     save_schema(nbas, schema_template_path,
                 os.path.join(save_path, f'{record_name}.pbtxt'))
