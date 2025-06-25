@@ -17,7 +17,7 @@ loss_weights = {'target': 0.5,
                 'vol': 1.5,
                 'surf': 1.5,
                 'dipole': 5.0}
-train_set_df = pd.read_csv('sl1_train_data.csv')
+train_set_df = pd.read_csv('train_data.csv')
 shuffle_buffer = {
     f'{cas}.tfrecord':
         train_set_df[train_set_df['cas'] == cas]['nconf'].sum() * 60
