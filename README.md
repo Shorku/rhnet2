@@ -30,11 +30,11 @@ and basis set overlap matrix.
 The three main data types the model works with are:
 - Electron structure information from 
 [quantum-chemical calculations](#quantum-chemical-data) (training data 
-preprocessing and inference)
+preparation and inference)
 - [Molecular graphs](#graph-data) derived from electron structure 
 (for training only)
 - [Tabular data](#tabular-data) e.g. containing target values, scalings etc. 
-(for training data preprocessing only)
+(for training data preparation only)
 
 ### Quantum Chemical Data
 
@@ -192,9 +192,30 @@ The necessary values will be automatically extracted from the calculation
 results if the schema template contains `dipole` key.    
 
 ### Tabular Data
-🚧 🛠️ 🚧
+Tabular data is used only to prepare the necessary quantum-chemical and graph 
+data. Stored in `.csv` format, it has the following format:
+```plaintext
+"cas","isomer_id","target","melt","logk","nconf"
+"153-61-7","153-61-7",2.83,1.600,-0.410,10
+"153-61-7","153-61-7_reflect",2.83,1.600,-0.410,11
+"90-15-3","90-15-3",4.02,0.957,2.850,2
+```
+`"cas"` Available compounds IDs
+
+`"isomer_id"` Available isomers IDs
+
+`"nconf"` Number of available conformers per isomer
+
+`"target"` True primary target values
+
+`"melt"` True additional target values
+
+`"logk"` True additional target values
+
 
 ## Model Fit
+<img src="images/gnn.jpg" width="800" alt="237">
+
 🚧 🛠️ 🚧
 
 ## Inference
