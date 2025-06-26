@@ -193,7 +193,7 @@ results if the schema template contains `dipole` key.
 
 ### Tabular Data
 Tabular data is used only to prepare the necessary quantum-chemical and graph 
-data. Stored in `.csv` format, it has the following format:
+data. Stored as `.csv`, it has the following format:
 ```plaintext
 "cas","isomer_id","target","melt","logk","nconf"
 "153-61-7","153-61-7",2.83,1.600,-0.410,10
@@ -216,7 +216,21 @@ data. Stored in `.csv` format, it has the following format:
 ## Model Fit
 <img src="images/gnn.jpg" width="800" alt="237">
 
-🚧 🛠️ 🚧
+`fit_utils` module provides several functions to train an RhNet2 model:
+* `model_fit` fits a model (optionally with validation), returns a trained 
+model and losses history
+* `ensemble_fit` sequentially fits several models and saves them along with 
+the losses history
+* `kfold_val` performs K-fold cross-validation, saves only the losses history
+* `loo_val` preforms Leave-One-Out cross-validation, saves trained models along 
+with the losses history
+
+The repository contains example scripts `fit_example.py` and `loo_example.py` 
+showing `model_fit` and `loo_val` functions usage.
+
+For model details see the corresponding
+[paper](https://doi.org/10.1021/acs.jctc.5c00425) and 
+[preprint](https://doi.org/10.26434/chemrxiv-2024-k2k3l-v3).
 
 ## Inference
 For inference, graphs and TF-GNN module are not needed. 
